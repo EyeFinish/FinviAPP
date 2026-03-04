@@ -1,0 +1,1350 @@
+/* ===== DASHBOARD ===== */
+.dashboard {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 32px 24px;
+}
+
+.dashboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 32px;
+}
+
+.dashboard-titulo {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--color-texto);
+}
+
+.dashboard-subtitulo {
+  font-size: 14px;
+  color: var(--color-texto-secundario);
+  margin-top: 4px;
+}
+
+.dashboard-acciones {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ===== BALANCE TOTAL ===== */
+.balance-total {
+  background: linear-gradient(135deg, var(--color-primario) 0%, var(--color-primario-oscuro) 100%);
+  border-radius: var(--radio-lg);
+  padding: 28px 32px;
+  margin-bottom: 32px;
+  color: var(--color-blanco);
+  box-shadow: var(--sombra-lg);
+}
+
+.balance-total-label {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  opacity: 0.85;
+}
+
+.balance-total-monto {
+  font-size: 32px;
+  font-weight: 700;
+  margin-top: 8px;
+}
+
+.balance-total-info {
+  font-size: 14px;
+  margin-top: 8px;
+  opacity: 0.75;
+}
+
+/* ===== GRID DE CUENTAS ===== */
+.cuentas-titulo {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-texto);
+  margin-bottom: 16px;
+}
+
+.cuentas-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+/* ===== TARJETA DE CUENTA ===== */
+.cuenta-card {
+  background-color: var(--color-blanco);
+  border-radius: var(--radio-md);
+  box-shadow: var(--sombra-sm);
+  border: 1px solid var(--color-borde);
+  padding: 24px;
+  cursor: pointer;
+  transition: var(--transicion);
+}
+
+.cuenta-card:hover {
+  box-shadow: var(--sombra-md);
+  border-color: #a7f3d0;
+}
+
+.cuenta-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.cuenta-card-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cuenta-card-icono {
+  width: 42px;
+  height: 42px;
+  background-color: var(--color-primario-claro);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-primario);
+  font-size: 18px;
+}
+
+.cuenta-card-nombre {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-texto);
+}
+
+.cuenta-card-tipo {
+  font-size: 12px;
+  color: var(--color-texto-secundario);
+}
+
+.cuenta-card-institucion {
+  font-size: 11px;
+  color: var(--color-texto-claro);
+  background-color: var(--color-borde-claro);
+  padding: 4px 8px;
+  border-radius: var(--radio-full);
+}
+
+.cuenta-card-saldo-label {
+  font-size: 12px;
+  color: var(--color-texto-secundario);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.cuenta-card-saldo {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--color-texto);
+  margin-top: 4px;
+}
+
+.cuenta-card-footer {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-borde-claro);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cuenta-card-movimientos-count {
+  font-size: 12px;
+  color: var(--color-texto-claro);
+}
+
+.cuenta-card-ver-detalle {
+  font-size: 12px;
+  color: var(--color-primario);
+  font-weight: 500;
+}
+
+/* ===== SECCIÓN MOVIMIENTOS ===== */
+.movimientos-seccion {
+  background-color: var(--color-blanco);
+  border-radius: var(--radio-lg);
+  box-shadow: var(--sombra-sm);
+  border: 1px solid var(--color-borde);
+  overflow: hidden;
+}
+
+.movimientos-header {
+  padding: 24px;
+  border-bottom: 1px solid var(--color-borde);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.movimientos-titulo {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-texto);
+}
+
+.movimientos-cuenta-info {
+  font-size: 14px;
+  color: var(--color-texto-secundario);
+  margin-top: 4px;
+}
+
+.movimientos-registros {
+  font-size: 14px;
+  color: var(--color-texto-claro);
+}
+
+/* ===== TABLA DE MOVIMIENTOS ===== */
+.movimientos-tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.movimientos-tabla thead tr {
+  border-bottom: 1px solid var(--color-borde);
+}
+
+.movimientos-tabla th {
+  text-align: left;
+  padding: 12px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-texto-secundario);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.movimientos-tabla th.col-monto {
+  text-align: right;
+}
+
+.movimientos-tabla tbody tr {
+  border-bottom: 1px solid var(--color-borde-claro);
+  transition: var(--transicion);
+}
+
+.movimientos-tabla tbody tr:hover {
+  background-color: var(--color-fondo);
+}
+
+.movimientos-tabla td {
+  padding: 12px 16px;
+  color: var(--color-texto);
+}
+
+.movimiento-descripcion {
+  font-weight: 500;
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.movimiento-comentario {
+  font-size: 12px;
+  color: var(--color-texto-claro);
+  margin-top: 2px;
+}
+
+.movimiento-tipo-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--radio-full);
+  font-size: 11px;
+  font-weight: 500;
+  background-color: var(--color-borde-claro);
+  color: var(--color-texto-secundario);
+  text-transform: capitalize;
+}
+
+.movimiento-monto {
+  text-align: right;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.movimiento-monto.ingreso {
+  color: var(--color-ingreso);
+}
+
+.movimiento-monto.egreso {
+  color: var(--color-egreso);
+}
+
+.movimiento-pendiente {
+  font-size: 11px;
+  color: var(--color-advertencia);
+  margin-left: 4px;
+}
+
+.movimientos-vacio {
+  text-align: center;
+  padding: 40px 16px;
+  color: var(--color-texto-claro);
+}
+
+.movimientos-vacio-icono {
+  font-size: 40px;
+  margin-bottom: 12px;
+  opacity: 0.4;
+}
+
+.movimientos-vacio-texto {
+  font-size: 14px;
+}
+
+/* ===== ESTADO VACÍO ===== */
+.estado-vacio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 64px);
+  padding: 24px;
+  text-align: center;
+}
+
+.estado-vacio-icono {
+  width: 80px;
+  height: 80px;
+  background-color: var(--color-borde-claro);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 24px;
+  font-size: 36px;
+  color: var(--color-texto-claro);
+}
+
+.estado-vacio-titulo {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-texto);
+  margin-bottom: 8px;
+}
+
+.estado-vacio-texto {
+  font-size: 15px;
+  color: var(--color-texto-secundario);
+  margin-bottom: 24px;
+}
+
+/* ===== LOADING ===== */
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 64px);
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid var(--color-borde);
+  border-top-color: var(--color-primario);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-texto {
+  font-size: 15px;
+  color: var(--color-texto-secundario);
+}
+
+/* ===== BOTONES ===== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: var(--radio-sm);
+  font-size: 14px;
+  font-weight: 500;
+  transition: var(--transicion);
+  border: none;
+  cursor: pointer;
+}
+
+.btn-primario {
+  background-color: var(--color-primario);
+  color: var(--color-blanco);
+}
+
+.btn-primario:hover {
+  background-color: var(--color-primario-hover);
+}
+
+.btn-primario:disabled {
+  background-color: var(--color-texto-claro);
+  cursor: not-allowed;
+}
+
+.btn-secundario {
+  background-color: var(--color-blanco);
+  color: var(--color-texto);
+  border: 1px solid var(--color-borde);
+}
+
+.btn-secundario:hover {
+  background-color: var(--color-fondo);
+}
+
+.btn-secundario:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-grande {
+  padding: 16px 32px;
+  font-size: 18px;
+  font-weight: 600;
+  border-radius: var(--radio-md);
+  box-shadow: var(--sombra-md);
+  width: 100%;
+}
+
+.btn-grande:hover {
+  box-shadow: var(--sombra-lg);
+  transform: translateY(-1px);
+}
+
+.btn-grande:active {
+  transform: translateY(0);
+}
+
+/* ===== MENSAJES ===== */
+.mensaje-error {
+  background-color: var(--color-error-fondo);
+  border: 1px solid var(--color-error-borde);
+  border-radius: var(--radio-sm);
+  padding: 16px;
+  margin-bottom: 24px;
+}
+
+.mensaje-error-texto {
+  color: #b91c1c;
+  font-size: 14px;
+}
+
+.mensaje-exito {
+  background-color: var(--color-primario-claro);
+  border: 1px solid #6ee7b7;
+  border-radius: var(--radio-sm);
+  padding: 16px;
+  margin-bottom: 24px;
+}
+
+.mensaje-exito-texto {
+  color: var(--color-primario-oscuro);
+  font-weight: 500;
+}
+
+.mensaje-advertencia {
+  background-color: var(--color-advertencia-fondo);
+  border: 1px solid var(--color-advertencia-borde);
+  border-radius: var(--radio-md);
+  padding: 16px;
+  margin-top: 16px;
+  text-align: center;
+}
+
+.mensaje-advertencia-texto {
+  color: #92400e;
+  font-size: 12px;
+}
+
+.mensaje-advertencia-texto strong {
+  font-weight: 700;
+}
+
+.mensaje-advertencia-texto code {
+  background-color: #fde68a;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 12px;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+  .dashboard-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .dashboard-acciones {
+    width: 100%;
+  }
+
+  .cuentas-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .movimientos-tabla {
+    font-size: 13px;
+  }
+
+  .movimientos-tabla th,
+  .movimientos-tabla td {
+    padding: 10px 12px;
+  }
+
+  .balance-total-monto {
+    font-size: 26px;
+  }
+}
+
+/* ===== RESUMEN CARDS (Balance + Deuda) ===== */
+.resumen-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.resumen-cards .deuda-total,
+.resumen-cards .balance-total {
+  padding: 16px 18px;
+  margin-bottom: 0;
+  border-radius: var(--radio-md);
+}
+
+.resumen-cards .balance-total-label,
+.resumen-cards .deuda-total-label {
+  font-size: 11px;
+  letter-spacing: 0.5px;
+}
+
+.resumen-cards .balance-total-monto,
+.resumen-cards .deuda-total-monto {
+  font-size: 22px;
+  margin-top: 4px;
+}
+
+.resumen-cards .balance-total-info,
+.resumen-cards .deuda-total-info {
+  font-size: 11px;
+  margin-top: 4px;
+}
+
+.deuda-total {
+  background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+  border-radius: var(--radio-lg);
+  padding: 28px 32px;
+  color: var(--color-blanco);
+  box-shadow: var(--sombra-lg);
+}
+
+.deuda-total-label {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  opacity: 0.85;
+}
+
+.deuda-total-monto {
+  font-size: 32px;
+  font-weight: 700;
+  margin-top: 8px;
+}
+
+.deuda-total-info {
+  font-size: 14px;
+  margin-top: 8px;
+  opacity: 0.75;
+}
+
+.alerta-moroso {
+  color: #fde68a;
+  font-weight: 600;
+}
+
+/* ===== SALUD FINANCIERA ===== */
+.salud-financiera {
+  background-color: var(--color-blanco);
+  border-radius: var(--radio-lg);
+  box-shadow: var(--sombra-sm);
+  border: 1px solid var(--color-borde);
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.salud-financiera-titulo {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-texto);
+  margin-bottom: 20px;
+}
+
+.salud-financiera-contenido {
+  display: flex;
+  align-items: center;
+  gap: 40px;
+}
+
+.salud-indicador {
+  position: relative;
+  width: 180px;
+  height: 180px;
+  flex-shrink: 0;
+}
+
+.salud-indicador-svg {
+  width: 100%;
+  height: 100%;
+}
+
+.salud-indicador-texto {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -40%);
+  text-align: center;
+}
+
+.salud-indicador-puntaje {
+  font-size: 36px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.salud-indicador-nivel {
+  font-size: 13px;
+  color: var(--color-texto-secundario);
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+.salud-metricas {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  flex: 1;
+}
+
+.salud-metrica {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background-color: #f9fafb;
+  border-radius: var(--radio-md);
+}
+
+.salud-metrica-icono {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.salud-metrica-icono.positivo { background-color: #d1fae5; }
+.salud-metrica-icono.negativo { background-color: #fee2e2; }
+.salud-metrica-icono.neutro { background-color: #e0e7ff; }
+
+.salud-metrica-label {
+  font-size: 12px;
+  color: var(--color-texto-secundario);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.salud-metrica-valor {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-texto);
+  margin-top: 2px;
+}
+
+.salud-metrica-valor.positivo { color: #10b981; }
+.salud-metrica-valor.negativo { color: #ef4444; }
+
+/* ===== CRÉDITOS ===== */
+.creditos-seccion {
+  margin-bottom: 32px;
+}
+
+.creditos-seccion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.creditos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
+}
+
+.creditos-vacio {
+  text-align: center;
+  padding: 40px 20px;
+  background-color: var(--color-blanco);
+  border-radius: var(--radio-lg);
+  border: 2px dashed var(--color-borde);
+}
+
+.creditos-vacio-icono {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.creditos-vacio-texto {
+  color: var(--color-texto-secundario);
+  font-size: 14px;
+  margin-bottom: 16px;
+  max-width: 400px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* ===== TARJETA CRÉDITO ===== */
+.credito-card {
+  background-color: var(--color-blanco);
+  border-radius: var(--radio-md);
+  box-shadow: var(--sombra-sm);
+  border: 1px solid var(--color-borde);
+  padding: 20px;
+  transition: var(--transicion);
+}
+
+.credito-card:hover {
+  box-shadow: var(--sombra-md);
+}
+
+.credito-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.credito-card-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.credito-card-icono {
+  width: 38px;
+  height: 38px;
+  background-color: #ede9fe;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+
+.credito-card-nombre {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-texto);
+}
+
+.credito-card-institucion {
+  font-size: 12px;
+  color: var(--color-texto-secundario);
+}
+
+.credito-card-acciones-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.credito-card-estado {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: var(--radio-full);
+}
+
+.credito-card-btn-eliminar {
+  background: none;
+  border: none;
+  color: var(--color-texto-claro);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: var(--transicion);
+}
+
+.credito-card-btn-eliminar:hover {
+  background-color: #fee2e2;
+  color: #ef4444;
+}
+
+.credito-card-tipo-badge {
+  display: inline-block;
+  font-size: 11px;
+  color: var(--color-texto-secundario);
+  background-color: #f3f4f6;
+  padding: 2px 8px;
+  border-radius: var(--radio-full);
+  margin-bottom: 12px;
+}
+
+.credito-card-montos {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.credito-card-monto-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.credito-card-monto-label {
+  font-size: 11px;
+  color: var(--color-texto-secundario);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.credito-card-monto-valor {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-texto);
+  margin-top: 2px;
+}
+
+.credito-card-monto-valor.deuda {
+  color: #ef4444;
+}
+
+.credito-card-progreso {
+  margin-bottom: 12px;
+}
+
+.credito-card-progreso-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.credito-card-progreso-label {
+  font-size: 12px;
+  color: var(--color-texto-secundario);
+}
+
+.credito-card-progreso-porcentaje {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-primario);
+}
+
+.credito-card-progreso-barra {
+  height: 6px;
+  background-color: #e5e7eb;
+  border-radius: var(--radio-full);
+  overflow: hidden;
+}
+
+.credito-card-progreso-relleno {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-primario) 0%, #34d399 100%);
+  border-radius: var(--radio-full);
+  transition: width 0.5s ease;
+}
+
+.credito-card-detalles {
+  display: flex;
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-borde-claro);
+}
+
+.credito-card-detalle {
+  font-size: 11px;
+  color: var(--color-texto-claro);
+}
+
+/* ===== RESUMEN DE PAGOS E INTERESES ===== */
+.credito-card-resumen-pagos {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 12px;
+  background-color: #f9fafb;
+  border-radius: var(--radio-md);
+  border: 1px solid var(--color-borde-claro);
+}
+
+.credito-card-resumen-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.credito-card-resumen-icono {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.credito-card-resumen-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.credito-card-resumen-label {
+  font-size: 10px;
+  color: var(--color-texto-secundario);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  font-weight: 500;
+}
+
+.credito-card-resumen-valor {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-texto);
+  margin-top: 1px;
+}
+
+.credito-card-resumen-valor.pagado {
+  color: #10b981;
+}
+
+.credito-card-resumen-valor.total {
+  color: #3b82f6;
+}
+
+.credito-card-resumen-valor.interes {
+  color: #f59e0b;
+}
+
+.credito-card-resumen-valor.restante {
+  color: #ef4444;
+}
+
+/* ===== BTN SM ===== */
+.btn-sm {
+  padding: 6px 14px;
+  font-size: 13px;
+}
+
+/* ===== RESPONSIVE CRÉDITOS ===== */
+@media (max-width: 1024px) {
+  .resumen-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .resumen-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .salud-financiera-contenido {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .salud-metricas {
+    grid-template-columns: 1fr;
+  }
+
+  .creditos-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .deuda-total-monto,
+  .resumen-cards .deuda-total-monto,
+  .resumen-cards .balance-total-monto {
+    font-size: 22px;
+  }
+
+  .credito-card-resumen-pagos {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ===== DESGLOSE POR BANCOS (Dashboard) ===== */
+.bancos-resumen {
+  margin-bottom: 32px;
+}
+
+.bancos-resumen-titulo {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-texto);
+  margin-bottom: 12px;
+}
+
+.bancos-resumen-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.banco-mini-card {
+  background-color: var(--color-blanco);
+  border-radius: var(--radio-md);
+  border: 1px solid var(--color-borde);
+  border-left: 4px solid #6b7280;
+  padding: 16px;
+  transition: var(--transicion);
+}
+
+.banco-mini-card:hover {
+  box-shadow: var(--sombra-sm);
+}
+
+.banco-mini-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.banco-mini-card-icono {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.banco-mini-card-nombre {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-texto);
+}
+
+.banco-mini-card-balance {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-texto);
+}
+
+.banco-mini-card-info {
+  font-size: 12px;
+  color: var(--color-texto-secundario);
+  margin-top: 4px;
+}
+
+/* ===== AGRUPACIÓN POR BANCO (Cuentas) ===== */
+.banco-grupo {
+  margin-bottom: 28px;
+}
+
+.banco-grupo-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background-color: var(--color-blanco);
+  border-radius: var(--radio-md);
+  border: 1px solid var(--color-borde);
+  margin-bottom: 12px;
+}
+
+.banco-grupo-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.banco-grupo-icono {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+
+.banco-grupo-nombre {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-texto);
+}
+
+.banco-grupo-detalle {
+  font-size: 12px;
+  color: var(--color-texto-secundario);
+  margin-top: 2px;
+}
+
+.banco-grupo-balance {
+  text-align: right;
+}
+
+.banco-grupo-balance-label {
+  font-size: 11px;
+  color: var(--color-texto-secundario);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.banco-grupo-balance-monto {
+  font-size: 20px;
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+/* ===== CONEXIONES BANCARIAS ===== */
+.conexiones-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 16px;
+}
+
+.conexion-card {
+  background-color: var(--color-blanco);
+  border-radius: var(--radio-md);
+  box-shadow: var(--sombra-sm);
+  border: 1px solid var(--color-borde);
+  padding: 24px;
+  transition: var(--transicion);
+}
+
+.conexion-card:hover {
+  box-shadow: var(--sombra-md);
+}
+
+.conexion-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.conexion-card-banco {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.conexion-card-icono {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.conexion-card-nombre {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-texto);
+}
+
+.conexion-card-titular {
+  font-size: 13px;
+  color: var(--color-texto-secundario);
+  margin-top: 2px;
+}
+
+.conexion-estado {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--radio-full);
+}
+
+.conexion-estado-active {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.conexion-estado-error {
+  background-color: #fee2e2;
+  color: #991b1b;
+}
+
+.conexion-estado-inactive {
+  background-color: #f3f4f6;
+  color: #6b7280;
+}
+
+.conexion-card-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 16px 0;
+  border-top: 1px solid var(--color-borde-claro);
+  border-bottom: 1px solid var(--color-borde-claro);
+}
+
+.conexion-card-stat-label {
+  font-size: 11px;
+  color: var(--color-texto-secundario);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.conexion-card-stat-valor {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-texto);
+  margin-top: 4px;
+}
+
+.conexion-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 16px;
+}
+
+.conexion-card-fecha {
+  font-size: 12px;
+  color: var(--color-texto-claro);
+}
+
+.btn-desconectar {
+  background: none;
+  border: 1px solid #fca5a5;
+  color: #ef4444;
+  padding: 6px 14px;
+  border-radius: var(--radio-sm);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transicion);
+}
+
+.btn-desconectar:hover {
+  background-color: #fee2e2;
+  border-color: #ef4444;
+}
+
+/* ===== RESPONSIVE MULTI-BANCO ===== */
+@media (max-width: 768px) {
+  .bancos-resumen-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .banco-grupo-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .banco-grupo-balance {
+    text-align: left;
+  }
+
+  .conexiones-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .conexion-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+}
+
+/* ===== BANNER DE CRÉDITOS PENDIENTES ===== */
+.pendientes-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  background: rgba(255, 169, 77, 0.08);
+  border: 1px solid rgba(255, 169, 77, 0.25);
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  animation: fadeInBanner 0.3s ease-out;
+}
+
+@keyframes fadeInBanner {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.pendientes-banner-icono {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.pendientes-banner-contenido {
+  flex: 1;
+}
+
+.pendientes-banner-contenido strong {
+  color: #ffa94d;
+  font-size: 0.9rem;
+}
+
+.pendientes-banner-contenido p {
+  color: #aaa;
+  font-size: 0.8rem;
+  margin: 4px 0 0;
+  line-height: 1.4;
+}
+
+.pendientes-banner-acciones {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.btn-pendiente {
+  background: linear-gradient(135deg, #ffa94d, #e8890c);
+  color: #1a1a2e;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.btn-pendiente:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 169, 77, 0.3);
+}
+
+@media (max-width: 768px) {
+  .pendientes-banner {
+    flex-direction: column;
+  }
+  .pendientes-banner-acciones {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+}

@@ -1,0 +1,161 @@
+/* ===== CONECTAR BANCO ===== */
+.conectar-banco {
+  min-height: calc(100vh - 64px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background-color: var(--color-fondo);
+}
+
+.conectar-banco-contenedor {
+  max-width: 480px;
+  width: 100%;
+}
+
+.conectar-banco-card {
+  background-color: var(--color-blanco);
+  border-radius: var(--radio-lg);
+  box-shadow: var(--sombra-lg);
+  border: 1px solid var(--color-borde);
+  padding: 40px;
+  text-align: center;
+}
+
+.conectar-banco-icono {
+  width: 80px;
+  height: 80px;
+  background-color: var(--color-primario-claro);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 24px;
+  font-size: 36px;
+}
+
+.conectar-banco-titulo {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--color-texto);
+  margin-bottom: 12px;
+}
+
+.conectar-banco-descripcion {
+  font-size: 15px;
+  color: var(--color-texto-secundario);
+  margin-bottom: 32px;
+  line-height: 1.6;
+}
+
+.conectar-banco-descripcion a {
+  color: var(--color-primario);
+  font-weight: 500;
+}
+
+.conectar-banco-descripcion a:hover {
+  color: var(--color-primario-hover);
+}
+
+/* Estado sincronizando */
+.conectar-banco-sync {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  color: var(--color-primario);
+}
+
+.conectar-banco-sync .loading-spinner {
+  width: 20px;
+  height: 20px;
+  border-width: 3px;
+  margin-bottom: 0;
+}
+
+.conectar-banco-sync-texto {
+  font-weight: 500;
+  font-size: 15px;
+}
+
+/* Seguridad */
+.conectar-banco-seguridad {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--color-borde);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+}
+
+.seguridad-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--color-texto-claro);
+}
+
+.seguridad-item-icono {
+  font-size: 14px;
+}
+
+@media (max-width: 480px) {
+  .conectar-banco-card {
+    padding: 24px;
+  }
+
+  .conectar-banco-seguridad {
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+
+/* ===== RESUMEN DE SINCRONIZACIÓN ===== */
+.sync-resumen {
+  background: rgba(16, 185, 129, 0.06);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-top: 12px;
+  text-align: left;
+}
+
+.sync-resumen-item {
+  font-size: 0.85rem;
+  color: var(--color-texto);
+  margin: 4px 0;
+  line-height: 1.5;
+}
+
+.sync-resumen-tipos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.sync-tipo-tag {
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-size: 0.75rem;
+  color: #6366f1;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.sync-creditos-ok {
+  color: #10b981;
+  font-weight: 600;
+  margin-top: 8px;
+}
+
+.sync-creditos-no {
+  color: #f59e0b;
+  font-style: italic;
+  margin-top: 8px;
+}
