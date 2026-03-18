@@ -1,4 +1,5 @@
 import { formatearMoneda, traducirTipoCuenta, obtenerInfoBanco } from '../utilidades/formateadores';
+import { Building2 } from 'lucide-react';
 
 function TarjetaCuenta({ cuenta, onClick }) {
   const infoBanco = obtenerInfoBanco(cuenta.institution);
@@ -12,7 +13,7 @@ function TarjetaCuenta({ cuenta, onClick }) {
             className="cuenta-card-icono"
             style={{ backgroundColor: infoBanco.colorClaro, color: infoBanco.color }}
           >
-            {infoBanco.icono}
+            <Building2 size={18} />
           </div>
           <div>
             <div className="cuenta-card-nombre">

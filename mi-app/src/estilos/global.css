@@ -1,24 +1,25 @@
 /* ===== VARIABLES GLOBALES ===== */
 :root {
-  --color-primario: #059669;
-  --color-primario-hover: #047857;
-  --color-primario-claro: #d1fae5;
-  --color-primario-oscuro: #065f46;
-  --color-fondo: #f9fafb;
+  --color-primario: #1800ad;
+  --color-primario-hover: #2d1fbe;
+  --color-primario-claro: #e0d9ff;
+  --color-primario-oscuro: #10007a;
+  --color-secundario: #5170ff;
+  --color-fondo: #f8f9fe;
   --color-blanco: #ffffff;
-  --color-texto: #111827;
-  --color-texto-secundario: #6b7280;
-  --color-texto-claro: #9ca3af;
-  --color-borde: #e5e7eb;
-  --color-borde-claro: #f3f4f6;
-  --color-exito: #059669;
+  --color-texto: #1a1a2e;
+  --color-texto-secundario: #555a7e;
+  --color-texto-claro: #8a8fb0;
+  --color-borde: #d8ddf5;
+  --color-borde-claro: #eef0fb;
+  --color-exito: #10b981;
   --color-error: #ef4444;
   --color-error-fondo: #fef2f2;
   --color-error-borde: #fecaca;
   --color-advertencia: #f59e0b;
   --color-advertencia-fondo: #fffbeb;
   --color-advertencia-borde: #fde68a;
-  --color-ingreso: #059669;
+  --color-ingreso: #10b981;
   --color-egreso: #ef4444;
   --sombra-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
   --sombra-md: 0 4px 6px rgba(0, 0, 0, 0.07);
@@ -28,6 +29,45 @@
   --radio-lg: 16px;
   --radio-full: 9999px;
   --transicion: all 0.2s ease;
+}
+
+/* ===== LUCIDE ICONS ===== */
+.sidebar-item-icono svg,
+.fc-card-icono svg,
+.fc-seccion-titulo svg,
+.fc-cat-grupo-titulo svg,
+.fc-cat-toggle svg,
+.fc-td-fija svg,
+.fc-card-alerta svg,
+.estado-vacio-icono svg,
+.creditos-vacio-icono svg,
+.fc-vacio-icono svg,
+.pendientes-banner-icono svg,
+.banco-mini-card-icono svg,
+.banco-grupo-icono svg,
+.conexion-card-icono svg,
+.cuenta-card-icono svg,
+.alerta-moroso svg {
+  display: inline-block;
+  vertical-align: middle;
+  stroke-width: 1.75;
+}
+
+.fc-btn-reanalizar svg,
+.btn svg {
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 6px;
+  stroke-width: 1.75;
+}
+
+.icon-spin {
+  animation: icon-spin 1s linear infinite;
+}
+
+@keyframes icon-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 /* ===== RESET Y BASE ===== */

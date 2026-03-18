@@ -1,10 +1,11 @@
 import { formatearMoneda, formatearFecha } from '../utilidades/formateadores';
+import { ClipboardList } from 'lucide-react';
 
 function TablaMovimientos({ movimientos, moneda = 'CLP' }) {
   if (!movimientos || movimientos.length === 0) {
     return (
       <div className="movimientos-vacio">
-        <div className="movimientos-vacio-icono">📋</div>
+        <div className="movimientos-vacio-icono"><ClipboardList size={36} /></div>
         <p className="movimientos-vacio-texto">No hay movimientos disponibles</p>
       </div>
     );
@@ -24,7 +25,7 @@ function TablaMovimientos({ movimientos, moneda = 'CLP' }) {
         <tbody>
           {movimientos.map((mov, index) => (
             <tr key={mov.id || index}>
-              <td style={{ whiteSpace: 'nowrap', color: '#6b7280' }}>
+              <td style={{ whiteSpace: 'nowrap', color: '#555a7e' }}>
                 {formatearFecha(mov.postDate || mov.transactionDate)}
               </td>
               <td>

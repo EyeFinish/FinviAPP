@@ -53,7 +53,7 @@
 }
 
 .form-credito-cerrar:hover {
-  background-color: #f3f4f6;
+  background-color: #eef0fb;
   color: var(--color-texto);
 }
 
@@ -90,7 +90,7 @@
 .form-input:focus {
   outline: none;
   border-color: var(--color-primario);
-  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+  box-shadow: 0 0 0 3px rgba(24, 0, 173, 0.1);
 }
 
 .form-input::placeholder {
@@ -107,8 +107,8 @@
 
 /* ===== VISTA PREVIA CÁLCULOS AUTOMÁTICOS ===== */
 .form-credito-preview {
-  background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
-  border: 1px solid #bbf7d0;
+  background: linear-gradient(135deg, #e0d9ff 0%, #eef0fb 100%);
+  border: 1px solid #b8c4ff;
   border-radius: var(--radio-md);
   padding: 16px 20px;
   margin-bottom: 20px;
@@ -148,7 +148,7 @@
 }
 
 .form-credito-preview-valor.verde {
-  color: #10b981;
+  color: #1800ad;
 }
 
 .form-credito-preview-valor.rojo {

@@ -1,0 +1,623 @@
+/* ===== Obligación Financiera ===== */
+.ob { padding: 0; }
+
+.ob-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 0;
+  color: #6b7280;
+  gap: 12px;
+}
+
+/* Header */
+.ob-header {
+  margin-bottom: 24px;
+}
+.ob-titulo {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--color-texto);
+}
+.ob-subtitulo {
+  font-size: 14px;
+  color: var(--color-texto-secundario);
+  margin-top: 4px;
+}
+
+/* Tabs */
+.ob-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 24px;
+  background: #f3f4f6;
+  padding: 4px;
+  border-radius: 12px;
+  overflow-x: auto;
+}
+.ob-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 18px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.ob-tab.activo {
+  background: #fff;
+  color: #111827;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.ob-tab:hover:not(.activo) { color: #374151; }
+
+/* Contenido */
+.ob-contenido { animation: fadeIn 0.2s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+/* Métricas */
+.ob-metricas {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.ob-metrica {
+  background: #fff;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  border: 1px solid #f3f4f6;
+}
+.ob-metrica.ingreso { border-left: 4px solid #10b981; }
+.ob-metrica.gasto { border-left: 4px solid #ef4444; }
+.ob-metrica.deuda { border-left: 4px solid #f59e0b; }
+.ob-metrica.positivo { border-left: 4px solid #3b82f6; }
+.ob-metrica.negativo { border-left: 4px solid #ef4444; }
+.ob-metrica-icono { margin-bottom: 8px; color: #9ca3af; }
+.ob-metrica.ingreso .ob-metrica-icono { color: #10b981; }
+.ob-metrica.gasto .ob-metrica-icono { color: #ef4444; }
+.ob-metrica.deuda .ob-metrica-icono { color: #f59e0b; }
+.ob-metrica.positivo .ob-metrica-icono { color: #3b82f6; }
+.ob-metrica.negativo .ob-metrica-icono { color: #ef4444; }
+.ob-metrica-label { font-size: 13px; color: #6b7280; font-weight: 500; margin-bottom: 4px; }
+.ob-metrica-valor { font-size: 22px; font-weight: 800; color: #111827; }
+.ob-metrica.ingreso .ob-metrica-valor { color: #059669; }
+.ob-metrica.gasto .ob-metrica-valor { color: #dc2626; }
+.ob-metrica.deuda .ob-metrica-valor { color: #d97706; }
+.ob-metrica.positivo .ob-metrica-valor { color: #2563eb; }
+.ob-metrica.negativo .ob-metrica-valor { color: #dc2626; }
+.ob-metrica-info { font-size: 12px; color: #9ca3af; margin-top: 6px; }
+
+/* Riesgo cards */
+.ob-riesgo-cards {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.ob-riesgo-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.ob-riesgo-titulo {
+  font-size: 13px;
+  font-weight: 600;
+  color: #6b7280;
+  margin-bottom: 12px;
+}
+.ob-riesgo-barra-fondo {
+  height: 10px;
+  background: #f3f4f6;
+  border-radius: 5px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.ob-riesgo-barra {
+  height: 100%;
+  border-radius: 5px;
+  transition: width 0.5s ease;
+}
+.ob-riesgo-valor {
+  font-size: 28px;
+  font-weight: 800;
+}
+.ob-riesgo-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+/* Desglose */
+.ob-desglose {
+  background: #fff;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.ob-desglose-titulo {
+  font-size: 15px;
+  font-weight: 700;
+  color: #374151;
+  margin-bottom: 16px;
+}
+.ob-desglose-lista { display: flex; flex-direction: column; gap: 12px; }
+.ob-desglose-item { margin-bottom: 0; }
+.ob-desglose-item-info {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.ob-desglose-item-nombre { font-size: 13px; font-weight: 600; color: #374151; }
+.ob-desglose-item-pct { font-size: 13px; color: #9ca3af; }
+.ob-desglose-barra-fondo {
+  height: 6px;
+  background: #f3f4f6;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 2px;
+}
+.ob-desglose-barra {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #f87171, #ef4444);
+}
+.ob-desglose-item-monto {
+  font-size: 13px;
+  font-weight: 700;
+  color: #374151;
+  text-align: right;
+}
+
+/* Sección header */
+.ob-seccion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.ob-seccion-header h2 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+}
+
+/* Vacío */
+.ob-vacio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 0;
+  color: #9ca3af;
+  gap: 16px;
+}
+.ob-vacio p { font-size: 16px; }
+
+/* Lista genérica */
+.ob-lista {
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  overflow: hidden;
+}
+.ob-lista-item {
+  display: flex;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #f3f4f6;
+  gap: 16px;
+}
+.ob-lista-item:last-of-type { border-bottom: none; }
+.ob-lista-item-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ob-lista-item-nombre { font-size: 14px; font-weight: 600; color: #374151; }
+.ob-lista-item-detalle { font-size: 12px; color: #9ca3af; }
+.ob-lista-item-monto { font-size: 16px; font-weight: 700; min-width: 140px; text-align: right; }
+.ob-lista-item-monto.ingreso { color: #059669; }
+.ob-lista-item-monto.gasto { color: #dc2626; }
+.ob-lista-item-mensual { font-size: 11px; color: #9ca3af; display: block; }
+.ob-lista-item-acciones { display: flex; gap: 4px; }
+.ob-btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  cursor: pointer;
+  color: #6b7280;
+  transition: all 0.15s;
+}
+.ob-btn-icon:hover { background: #f3f4f6; color: #374151; }
+.ob-btn-icon.danger:hover { background: #fef2f2; color: #dc2626; border-color: #fecaca; }
+.ob-lista-total {
+  display: flex;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: #f9fafb;
+  font-size: 15px;
+  font-weight: 700;
+  color: #374151;
+  border-top: 2px solid #e5e7eb;
+}
+.ob-lista-total .ingreso { color: #059669; }
+.ob-lista-total .gasto { color: #dc2626; }
+
+/* Deudas grid */
+.ob-deudas-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
+}
+.ob-deuda-card {
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  border: 1px solid #f3f4f6;
+  overflow: hidden;
+}
+.ob-deuda-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 12px;
+}
+.ob-deuda-card-header h4 { font-size: 16px; font-weight: 700; color: #111827; margin: 0; }
+.ob-deuda-card-acciones { display: flex; gap: 4px; }
+.ob-deuda-card-body { padding: 0 20px 12px; }
+.ob-deuda-fila {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  font-size: 13px;
+  border-bottom: 1px solid #fafafa;
+}
+.ob-deuda-fila:last-child { border-bottom: none; }
+.ob-deuda-fila span:first-child { color: #6b7280; }
+.ob-deuda-fila span:last-child { font-weight: 600; color: #374151; }
+.ob-deuda-fila .gasto { color: #dc2626; }
+.ob-deuda-progreso { padding: 12px 20px 16px; }
+.ob-deuda-progreso-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 6px;
+}
+.ob-deuda-progreso-barra {
+  height: 8px;
+  background: #f3f4f6;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.ob-deuda-progreso-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #5170ff, #1800ad);
+  transition: width 0.5s ease;
+}
+
+/* Proyección */
+.ob-proy-titulo {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 20px;
+}
+.ob-proy-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 12px;
+}
+.ob-proy-card {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  overflow: hidden;
+}
+.ob-proy-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.ob-proy-card-header:hover { background: #f9fafb; }
+.ob-proy-mes {
+  font-size: 14px;
+  font-weight: 700;
+  color: #374151;
+  text-transform: capitalize;
+}
+.ob-proy-flujo {
+  font-size: 15px;
+  font-weight: 800;
+}
+.ob-proy-flujo.positivo { color: #059669; }
+.ob-proy-flujo.negativo { color: #dc2626; }
+.ob-proy-detalle {
+  padding: 0 18px 14px;
+  border-top: 1px solid #f3f4f6;
+}
+.ob-proy-fila {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  font-size: 13px;
+}
+.ob-proy-fila.ingreso span:last-child { color: #059669; font-weight: 600; }
+.ob-proy-fila.gasto span:last-child { color: #dc2626; font-weight: 600; }
+.ob-proy-separador {
+  border-top: 1px dashed #e5e7eb;
+  margin: 8px 0;
+}
+.ob-proy-venc-titulo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #6b7280;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.ob-proy-venc {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  font-size: 12px;
+  color: #6b7280;
+}
+.ob-proy-venc.ingreso span:last-child { color: #059669; }
+.ob-proy-venc.costo span:last-child { color: #dc2626; }
+.ob-proy-venc.deuda span:last-child { color: #d97706; }
+
+/* Modal */
+.ob-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.15s ease;
+}
+.ob-modal {
+  background: #fff;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+}
+.ob-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid #f3f4f6;
+}
+.ob-modal-header h3 { font-size: 18px; font-weight: 700; color: #111827; margin: 0; }
+.ob-modal-cerrar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: #f3f4f6;
+  cursor: pointer;
+  color: #6b7280;
+}
+.ob-modal-cerrar:hover { background: #e5e7eb; }
+.ob-modal-body { padding: 24px; }
+
+/* Formularios */
+.ob-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.ob-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+}
+.ob-form input,
+.ob-form select {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid #d1d5db;
+  font-size: 14px;
+  color: #111827;
+  background: #fff;
+  transition: border-color 0.15s;
+}
+.ob-form input:focus,
+.ob-form select:focus {
+  outline: none;
+  border-color: #5170ff;
+  box-shadow: 0 0 0 3px rgba(81,112,255,0.12);
+}
+.ob-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.ob-form-acciones {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+/* Toggle buttons (tipo compromiso) */
+.ob-toggle-row {
+  display: flex;
+  gap: 8px;
+}
+.ob-toggle-btn {
+  padding: 8px 16px;
+  border-radius: 20px;
+  border: 1px solid #d1d5db;
+  background: #f9fafb;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.ob-toggle-btn.activo {
+  background: var(--color-primario, #5170ff);
+  color: #fff;
+  border-color: var(--color-primario, #5170ff);
+}
+
+/* Preview cálculo deuda */
+.ob-preview {
+  background: #f0f4ff;
+  border: 1px solid #dbe4ff;
+  border-radius: 12px;
+  padding: 16px;
+}
+.ob-preview h4 {
+  font-size: 13px;
+  font-weight: 700;
+  color: #374151;
+  margin: 0 0 12px 0;
+}
+.ob-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.ob-preview-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ob-preview-grid span {
+  font-size: 11px;
+  color: #6b7280;
+}
+.ob-preview-grid strong {
+  font-size: 15px;
+  color: #111827;
+}
+
+/* Botón tabla amortización */
+.ob-btn-tabla {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  justify-content: center;
+  padding: 10px;
+  margin-top: 10px;
+  border: 1px dashed #d1d5db;
+  border-radius: 8px;
+  background: #f9fafb;
+  color: #5170ff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.ob-btn-tabla:hover {
+  background: #eef2ff;
+  border-color: #5170ff;
+}
+
+/* Tabla amortización */
+.ob-amort-tabla-wrapper {
+  max-height: 400px;
+  overflow-y: auto;
+  margin-top: 12px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+.ob-amort-tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.ob-amort-tabla thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.ob-amort-tabla th {
+  background: #f3f4f6;
+  padding: 8px 10px;
+  text-align: right;
+  font-weight: 700;
+  color: #374151;
+  border-bottom: 2px solid #e5e7eb;
+}
+.ob-amort-tabla th:first-child {
+  text-align: center;
+  width: 40px;
+}
+.ob-amort-tabla td {
+  padding: 6px 10px;
+  text-align: right;
+  color: #374151;
+  border-bottom: 1px solid #f3f4f6;
+}
+.ob-amort-tabla td:first-child {
+  text-align: center;
+  font-weight: 600;
+  color: #6b7280;
+}
+.ob-amort-tabla tr.pagada {
+  background: #f0fdf4;
+}
+.ob-amort-tabla tr.pagada td {
+  color: #16a34a;
+}
+.ob-amort-tabla tbody tr:hover {
+  background: #f9fafb;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .ob-metricas { grid-template-columns: repeat(2, 1fr); }
+  .ob-riesgo-cards { grid-template-columns: 1fr; }
+  .ob-preview-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 600px) {
+  .ob-metricas { grid-template-columns: 1fr; }
+  .ob-tabs { flex-wrap: nowrap; }
+  .ob-deudas-grid { grid-template-columns: 1fr; }
+  .ob-proy-grid { grid-template-columns: 1fr; }
+  .ob-form-row { grid-template-columns: 1fr; }
+  .ob-toggle-row { flex-direction: column; }
+}

@@ -3,6 +3,9 @@
   background-color: var(--color-primario-oscuro);
   box-shadow: var(--sombra-md);
   height: 64px;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
 }
 
 .navbar-contenedor {
@@ -24,14 +27,14 @@
 .navbar-logo-icono {
   width: 34px;
   height: 34px;
-  background-color: #34d399;
+  background-color: #5170ff;
   border-radius: var(--radio-sm);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
   font-size: 18px;
-  color: var(--color-primario-oscuro);
+  color: var(--color-blanco);
 }
 
 .navbar-logo-texto {
@@ -52,7 +55,7 @@
   border-radius: var(--radio-sm);
   font-size: 14px;
   font-weight: 500;
-  color: #a7f3d0;
+  color: #b8c4ff;
   transition: var(--transicion);
   background: none;
 }

@@ -2,6 +2,11 @@ const mongoose = require('mongoose');
 
 const fintocLinkSchema = new mongoose.Schema(
   {
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
     linkToken: {
       type: String,
       required: [true, 'El link token es obligatorio'],

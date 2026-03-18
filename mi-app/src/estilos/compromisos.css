@@ -1,0 +1,281 @@
+/* ===== COMPROMISOS DEL MES ===== */
+
+.compromisos-seccion {
+  margin-top: 24px;
+}
+
+.compromisos-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.compromisos-titulo {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.compromisos-badge {
+  background: #eef2ff;
+  color: #1800ad;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 99px;
+}
+
+.compromisos-badge.alerta {
+  background: #fef2f2;
+  color: #ef4444;
+}
+
+/* Barra de progreso general */
+.progreso-general {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+
+.progreso-general-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 10px;
+}
+
+.progreso-general-label {
+  font-size: 14px;
+  color: #555a7e;
+  font-weight: 500;
+}
+
+.progreso-general-valor {
+  font-size: 14px;
+  color: #1a1a2e;
+  font-weight: 700;
+}
+
+.barra-fondo {
+  height: 10px;
+  background: #d8ddf5;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.barra-progreso {
+  height: 100%;
+  border-radius: 5px;
+  transition: width 0.3s ease;
+}
+
+.barra-fondo-sm {
+  height: 6px;
+  background: #d8ddf5;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+/* Grid de obligaciones */
+.obligaciones-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.obligacion-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  border-left: 4px solid #d8ddf5;
+}
+
+.obligacion-card.costo-fijo {
+  border-left-color: #5170ff;
+}
+
+.obligacion-card.deuda {
+  border-left-color: #f97316;
+}
+
+.obligacion-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.obligacion-card-nombre {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
+.obligacion-card-tipo {
+  font-size: 11px;
+  color: #555a7e;
+  margin-top: 2px;
+}
+
+.obligacion-card-porcentaje {
+  font-size: 13px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 99px;
+}
+
+.obligacion-card-montos {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #555a7e;
+  margin-top: 8px;
+}
+
+.obligacion-card-montos strong {
+  color: #1a1a2e;
+}
+
+/* Movimientos de cada obligación */
+.obligacion-movs {
+  margin-top: 8px;
+  border-top: 1px solid #d8ddf5;
+  padding-top: 8px;
+}
+
+.obligacion-mov-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  font-size: 12px;
+  color: #555a7e;
+}
+
+.obligacion-mov-item .mov-desc {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-right: 8px;
+}
+
+.obligacion-mov-item .mov-monto {
+  font-weight: 600;
+  color: #1a1a2e;
+  white-space: nowrap;
+}
+
+.btn-desasignar-sm {
+  background: none;
+  border: none;
+  color: #ef4444;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 0 4px;
+  margin-left: 4px;
+}
+
+.btn-desasignar-sm:hover {
+  text-decoration: underline;
+}
+
+/* ===== TRANSACCIONES SIN ASIGNAR ===== */
+
+.sin-asignar-seccion {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  margin-bottom: 24px;
+}
+
+.sin-asignar-subtitulo {
+  font-size: 13px;
+  color: #555a7e;
+  margin-bottom: 12px;
+}
+
+.sin-asignar-tabla {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.sin-asignar-tabla th {
+  text-align: left;
+  font-size: 11px;
+  color: #555a7e;
+  font-weight: 600;
+  padding: 8px 4px;
+  border-bottom: 2px solid #d8ddf5;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.sin-asignar-tabla td {
+  padding: 10px 4px;
+  font-size: 13px;
+  color: #1a1a2e;
+  border-bottom: 1px solid #f0f0f5;
+  vertical-align: middle;
+}
+
+.sin-asignar-tabla tr:hover {
+  background: #f8f9fe;
+}
+
+.sin-asignar-monto {
+  font-weight: 700;
+  color: #ef4444;
+  white-space: nowrap;
+}
+
+.select-obligacion {
+  font-size: 12px;
+  padding: 4px 8px;
+  border: 1px solid #d8ddf5;
+  border-radius: 8px;
+  color: #1a1a2e;
+  background: #f8f9fe;
+  cursor: pointer;
+  min-width: 150px;
+}
+
+.select-obligacion:focus {
+  border-color: #1800ad;
+  outline: none;
+}
+
+.btn-asignar {
+  background: #1800ad;
+  color: white;
+  border: none;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-left: 6px;
+  white-space: nowrap;
+}
+
+.btn-asignar:hover {
+  background: #10007a;
+}
+
+.btn-asignar:disabled {
+  background: #d8ddf5;
+  cursor: not-allowed;
+}
+
+.td-asignar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}

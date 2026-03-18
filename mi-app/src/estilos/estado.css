@@ -1,0 +1,308 @@
+/* ===== Estado Financiero ===== */
+.ef { padding: 0; }
+
+.ef-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 0;
+  color: #6b7280;
+  gap: 12px;
+}
+
+.ef-vacio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 0;
+  color: #9ca3af;
+  gap: 16px;
+}
+.ef-vacio p { font-size: 16px; }
+
+/* Header row */
+.ef-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* Selector de mes */
+.ef-selector-mes {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+/* Botón resync */
+.ef-resync-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: #4f46e5;
+  transition: all 0.15s;
+}
+.ef-resync-btn:hover:not(:disabled) { background: #f0f0ff; border-color: #c7d2fe; }
+.ef-resync-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.ef-mes-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  cursor: pointer;
+  color: #374151;
+  transition: all 0.15s;
+}
+.ef-mes-btn:hover:not(:disabled) { background: #f3f4f6; border-color: #d1d5db; }
+.ef-mes-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.ef-mes-label {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+  text-transform: capitalize;
+  min-width: 180px;
+  text-align: center;
+}
+
+/* Resumen cards */
+.ef-resumen {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.ef-resumen-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  border: 1px solid #f3f4f6;
+}
+.ef-resumen-card.ingreso { border-left: 4px solid #10b981; }
+.ef-resumen-card.gasto { border-left: 4px solid #ef4444; }
+.ef-resumen-card.positivo { border-left: 4px solid #3b82f6; }
+.ef-resumen-card.negativo { border-left: 4px solid #f97316; }
+.ef-resumen-icono { margin-bottom: 8px; color: #9ca3af; }
+.ef-resumen-card.ingreso .ef-resumen-icono { color: #10b981; }
+.ef-resumen-card.gasto .ef-resumen-icono { color: #ef4444; }
+.ef-resumen-card.positivo .ef-resumen-icono { color: #3b82f6; }
+.ef-resumen-card.negativo .ef-resumen-icono { color: #f97316; }
+.ef-resumen-label { font-size: 13px; color: #6b7280; font-weight: 500; margin-bottom: 4px; }
+.ef-resumen-monto { font-size: 22px; font-weight: 800; color: #111827; }
+.ef-resumen-card.ingreso .ef-resumen-monto { color: #059669; }
+.ef-resumen-card.gasto .ef-resumen-monto { color: #dc2626; }
+.ef-resumen-card.positivo .ef-resumen-monto { color: #2563eb; }
+.ef-resumen-card.negativo .ef-resumen-monto { color: #ea580c; }
+.ef-resumen-info { font-size: 12px; color: #9ca3af; margin-top: 6px; }
+
+/* Toggle vista */
+.ef-vista-toggle {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  background: #f3f4f6;
+  padding: 4px;
+  border-radius: 12px;
+  width: fit-content;
+}
+.ef-vista-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.ef-vista-btn.activo {
+  background: #fff;
+  color: #111827;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.ef-vista-btn:hover:not(.activo) { color: #374151; }
+
+/* Grupos de categorías */
+.ef-categorias { display: flex; flex-direction: column; gap: 24px; }
+.ef-grupo {
+  background: #fff;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.ef-grupo-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f3f4f6;
+}
+.ef-grupo-titulo {
+  font-size: 15px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.ef-grupo-titulo.ingreso { color: #059669; }
+.ef-grupo-titulo.gasto { color: #dc2626; }
+.ef-grupo-total { font-size: 15px; font-weight: 700; color: #374151; }
+
+/* Items de categoría */
+.ef-item {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid #fafafa;
+}
+.ef-item:last-child { border-bottom: none; }
+.ef-item-info { display: flex; flex-direction: column; gap: 2px; }
+.ef-item-nombre { font-size: 14px; font-weight: 600; color: #374151; }
+.ef-item-cantidad { font-size: 11px; color: #9ca3af; }
+.ef-item-barra-container {
+  height: 8px;
+  background: #f3f4f6;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.ef-item-barra {
+  height: 100%;
+  border-radius: 4px;
+  min-width: 3px;
+  transition: width 0.3s ease;
+}
+.ef-item-barra.ingreso { background: linear-gradient(90deg, #34d399, #10b981); }
+.ef-item-barra.gasto { background: linear-gradient(90deg, #f87171, #ef4444); }
+.ef-item-datos {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  min-width: 110px;
+}
+.ef-item-monto {
+  font-size: 14px;
+  font-weight: 700;
+}
+.ef-item-monto.ingreso { color: #059669; }
+.ef-item-monto.gasto { color: #dc2626; }
+.ef-item-porcentaje { font-size: 11px; color: #9ca3af; display: flex; align-items: center; gap: 4px; }
+
+/* Expandir categorías */
+.ef-item-clickable { cursor: pointer; border-radius: 8px; transition: background 0.15s; }
+.ef-item-clickable:hover { background: #f9fafb; }
+.ef-chevron { transition: transform 0.2s; }
+.ef-chevron.abierto { transform: rotate(180deg); }
+.ef-item-wrap { border-bottom: 1px solid #fafafa; }
+.ef-item-wrap:last-child { border-bottom: none; }
+.ef-item-wrap .ef-item { border-bottom: none; }
+.ef-detalle {
+  background: #f9fafb;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin: 0 0 8px 0;
+}
+.ef-detalle-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+.ef-detalle-item:last-child { border-bottom: none; }
+.ef-detalle-desc { display: flex; flex-direction: column; gap: 2px; flex: 1; margin-right: 12px; }
+.ef-detalle-desc span:first-child { font-size: 13px; color: #374151; }
+.ef-detalle-meta { font-size: 11px; color: #9ca3af; }
+.ef-detalle-monto { font-size: 13px; font-weight: 700; white-space: nowrap; }
+.ef-detalle-monto.ingreso { color: #059669; }
+.ef-detalle-monto.gasto { color: #dc2626; }
+
+/* Vista por tipo */
+.ef-item-tipo {
+  grid-template-columns: 1fr auto;
+}
+.ef-tipo-montos {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+/* Top movimientos */
+.ef-tops {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-top: 24px;
+}
+.ef-top-seccion {
+  background: #fff;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.ef-top-titulo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #374151;
+  margin-bottom: 16px;
+}
+.ef-top-tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.ef-top-tabla th {
+  text-align: left;
+  font-weight: 600;
+  color: #9ca3af;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 8px 6px;
+  border-bottom: 1px solid #f3f4f6;
+}
+.ef-top-tabla td {
+  padding: 10px 6px;
+  border-bottom: 1px solid #fafafa;
+  color: #374151;
+}
+.ef-th-monto, .ef-td-monto { text-align: right; }
+.ef-td-monto { font-weight: 700; }
+.ef-td-monto.ingreso { color: #059669; }
+.ef-td-monto.gasto { color: #dc2626; }
+.ef-td-cuenta { color: #9ca3af; font-size: 12px; }
+.ef-td-fecha { color: #9ca3af; white-space: nowrap; }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .ef-resumen { grid-template-columns: 1fr; }
+  .ef-tops { grid-template-columns: 1fr; }
+  .ef-item { grid-template-columns: 1fr auto; }
+  .ef-item-barra-container { display: none; }
+}

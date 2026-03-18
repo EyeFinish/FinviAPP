@@ -16,9 +16,13 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Rutas
+app.use('/api/auth', require('./routes/auth'));
 app.use('/api/fintoc', require('./routes/fintoc'));
 app.use('/api/creditos', require('./routes/creditos'));
-app.use('/api/flujo', require('./routes/flujo'));
+app.use('/api/estado', require('./routes/estado'));
+app.use('/api/obligaciones', require('./routes/obligaciones'));
+app.use('/api/movimientos', require('./routes/movimientos'));
+app.use('/api/notifications', require('./routes/notifications'));
 
 // Ruta de salud
 app.get('/', (req, res) => {
@@ -56,6 +60,10 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log(`Servidor Finvi corriendo en http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Servidor Finvi corriendo en http://0.0.0.0:${PORT}`);
+
+  // Iniciar scheduler de alertas
+  const { iniciarScheduler } = require('./services/alertScheduler');
+  iniciarScheduler();
 });

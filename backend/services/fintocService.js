@@ -5,6 +5,7 @@ const FINTOC_BASE_URL = 'https://api.fintoc.com/v1';
 const fintocApi = axios.create({
   baseURL: FINTOC_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
+  timeout: 30000, // 30s por request para evitar cuelgues
 });
 
 fintocApi.interceptors.request.use((config) => {
@@ -43,10 +44,31 @@ const getAccount = async (accountId, linkToken) => {
 };
 
 const getMovements = async (accountId, linkToken, params = {}) => {
-  const response = await fintocApi.get(`/accounts/${accountId}/movements`, {
-    params: { link_token: linkToken, per_page: 30, ...params },
-  });
-  return response.data;
+  const allMovements = [];
+  let page = 1;
+  const perPage = 100;
+  const maxMovements = 50000; // Sin límite práctico: obtener todo el historial
+  const maxPages = 500; // Suficiente para historial completo
+
+  while (allMovements.length < maxMovements && page <= maxPages) {
+    try {
+      const response = await fintocApi.get(`/accounts/${accountId}/movements`, {
+        params: { link_token: linkToken, per_page: perPage, page, ...params },
+        timeout: 15000, // 15s por página de movimientos
+      });
+      const data = response.data;
+      if (!Array.isArray(data) || data.length === 0) break;
+      allMovements.push(...data);
+      if (data.length < perPage) break;
+      page++;
+    } catch (err) {
+      // Si falla una página, devolver lo que se tiene hasta ahora
+      console.warn(`Página ${page} de movimientos falló para cuenta ${accountId}:`, err.message);
+      break;
+    }
+  }
+
+  return allMovements.slice(0, maxMovements);
 };
 
 const deleteLink = async (linkToken) => {

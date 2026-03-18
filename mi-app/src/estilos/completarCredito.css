@@ -15,7 +15,7 @@
 
 /* ========== Modal ========== */
 .completar-modal {
-  background: #1e1e2f;
+  background: #1a1a2e;
   border-radius: 16px;
   width: 95%;
   max-width: 560px;
@@ -63,8 +63,8 @@
 
 /* ========== Imported Data Section ========== */
 .completar-importado {
-  background: rgba(162, 89, 255, 0.08);
-  border: 1px solid rgba(162, 89, 255, 0.2);
+  background: rgba(81, 112, 255, 0.08);
+  border: 1px solid rgba(81, 112, 255, 0.2);
   border-radius: 12px;
   padding: 16px;
   margin-bottom: 20px;
@@ -72,7 +72,7 @@
 
 .completar-importado-tag {
   font-size: 0.7rem;
-  color: #a259ff;
+  color: #5170ff;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -158,8 +158,8 @@
 }
 
 .completar-form-grid .form-input {
-  background: #2a2a3d;
-  border: 1px solid #3a3a4f;
+  background: #252540;
+  border: 1px solid #3a3a5a;
   border-radius: 8px;
   padding: 10px 12px;
   color: #f4f4f9;
@@ -169,8 +169,8 @@
 
 .completar-form-grid .form-input:focus {
   outline: none;
-  border-color: #a259ff;
-  box-shadow: 0 0 0 2px rgba(162, 89, 255, 0.15);
+  border-color: #5170ff;
+  box-shadow: 0 0 0 2px rgba(81, 112, 255, 0.15);
 }
 
 .completar-form-grid .form-input::placeholder {
@@ -179,8 +179,8 @@
 
 /* ========== Preview ========== */
 .completar-preview {
-  background: rgba(81, 207, 102, 0.06);
-  border: 1px solid rgba(81, 207, 102, 0.15);
+  background: rgba(81, 112, 255, 0.06);
+  border: 1px solid rgba(81, 112, 255, 0.15);
   border-radius: 10px;
   padding: 14px 16px;
   margin-bottom: 20px;
@@ -188,7 +188,7 @@
 
 .completar-preview-titulo {
   font-size: 0.8rem;
-  color: #51cf66;
+  color: #5170ff;
   font-weight: 600;
   margin: 0 0 10px;
 }
@@ -253,20 +253,20 @@
 }
 
 .btn-primario {
-  background: linear-gradient(135deg, #a259ff, #7c3aed);
+  background: linear-gradient(135deg, #5170ff, #1800ad);
   color: #fff;
 }
 .btn-primario:hover:not(:disabled) {
-  background: linear-gradient(135deg, #b370ff, #8b47ff);
+  background: linear-gradient(135deg, #6b85ff, #2d1fbe);
 }
 
 .btn-secundario {
-  background: #2a2a3d;
+  background: #252540;
   color: #ccc;
-  border: 1px solid #3a3a4f;
+  border: 1px solid #3a3a5a;
 }
 .btn-secundario:hover:not(:disabled) {
-  background: #353550;
+  background: #30304d;
 }
 
 .btn-texto {

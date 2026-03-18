@@ -7,6 +7,44 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+// Interceptor: adjuntar token JWT a cada petición
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('finvi_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// Interceptor: si el servidor responde 401, cerrar sesión
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401 && localStorage.getItem('finvi_token')) {
+      localStorage.removeItem('finvi_token');
+      localStorage.removeItem('finvi_user');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
+// ===== AUTH =====
+export const registrarUsuario = async (datos) => {
+  const response = await api.post('/auth/registro', datos);
+  return response.data;
+};
+
+export const loginUsuario = async (datos) => {
+  const response = await api.post('/auth/login', datos);
+  return response.data;
+};
+
+export const obtenerUsuarioActual = async () => {
+  const response = await api.get('/auth/me');
+  return response.data;
+};
+
 export const crearLinkIntent = async () => {
   const response = await api.post('/fintoc/link-intent');
   return response.data;
@@ -29,6 +67,11 @@ export const obtenerMovimientos = async (accountId) => {
 
 export const refrescarDatos = async () => {
   const response = await api.post('/fintoc/refresh');
+  return response.data;
+};
+
+export const resincronizarDatos = async () => {
+  const response = await api.post('/fintoc/resync');
   return response.data;
 };
 
@@ -80,34 +123,130 @@ export const eliminarCredito = async (id) => {
   return response.data;
 };
 
-// ===== FLUJO DE CAJA =====
-export const obtenerAnalisisFlujo = async () => {
-  const response = await api.get('/flujo/analisis');
+// ===== PAGOS DE CRÉDITOS (detección automática) =====
+export const obtenerPagosSinVincular = async () => {
+  const response = await api.get('/creditos/pagos-sin-vincular');
   return response.data;
 };
 
-export const obtenerProyeccionFlujoCompleta = async (meses = 12) => {
-  const response = await api.get('/flujo/proyeccion', { params: { meses } });
+export const obtenerPagosDetectados = async (creditoId) => {
+  const response = await api.get(`/creditos/${creditoId}/pagos-detectados`);
   return response.data;
 };
 
-export const actualizarCategoriaFlujo = async (id, datos) => {
-  const response = await api.put(`/flujo/categorias/${id}`, datos);
+export const confirmarPagoCredito = async (creditoId, movimientoId) => {
+  const response = await api.post(`/creditos/${creditoId}/confirmar-pago`, { movimientoId });
   return response.data;
 };
 
-export const crearCategoriaFlujo = async (datos) => {
-  const response = await api.post('/flujo/categorias', datos);
+export const desvincularPagoCredito = async (creditoId, movimientoId) => {
+  const response = await api.post(`/creditos/${creditoId}/desvincular-pago`, { movimientoId });
   return response.data;
 };
 
-export const eliminarCategoriaFlujo = async (id) => {
-  const response = await api.delete(`/flujo/categorias/${id}`);
+export const obtenerTransaccionesCredito = async (creditoId) => {
+  const response = await api.get(`/creditos/${creditoId}/transacciones`);
   return response.data;
 };
 
-export const reanalizarFlujo = async () => {
-  const response = await api.post('/flujo/reanalizar');
+// ===== OBLIGACIONES FINANCIERAS =====
+export const obtenerResumenObligaciones = async () => {
+  const response = await api.get('/obligaciones/resumen');
+  return response.data;
+};
+
+export const obtenerIngresos = async () => {
+  const response = await api.get('/obligaciones/ingresos');
+  return response.data;
+};
+
+export const crearIngreso = async (datos) => {
+  const response = await api.post('/obligaciones/ingresos', datos);
+  return response.data;
+};
+
+export const actualizarIngreso = async (id, datos) => {
+  const response = await api.put(`/obligaciones/ingresos/${id}`, datos);
+  return response.data;
+};
+
+export const eliminarIngreso = async (id) => {
+  const response = await api.delete(`/obligaciones/ingresos/${id}`);
+  return response.data;
+};
+
+export const obtenerCostosFijos = async () => {
+  const response = await api.get('/obligaciones/costos');
+  return response.data;
+};
+
+export const crearCostoFijo = async (datos) => {
+  const response = await api.post('/obligaciones/costos', datos);
+  return response.data;
+};
+
+export const actualizarCostoFijo = async (id, datos) => {
+  const response = await api.put(`/obligaciones/costos/${id}`, datos);
+  return response.data;
+};
+
+export const eliminarCostoFijo = async (id) => {
+  const response = await api.delete(`/obligaciones/costos/${id}`);
+  return response.data;
+};
+
+export const obtenerDeudas = async () => {
+  const response = await api.get('/obligaciones/deudas');
+  return response.data;
+};
+
+export const crearDeuda = async (datos) => {
+  const response = await api.post('/obligaciones/deudas', datos);
+  return response.data;
+};
+
+export const actualizarDeuda = async (id, datos) => {
+  const response = await api.put(`/obligaciones/deudas/${id}`, datos);
+  return response.data;
+};
+
+export const eliminarDeuda = async (id) => {
+  const response = await api.delete(`/obligaciones/deudas/${id}`);
+  return response.data;
+};
+
+export const obtenerTablaAmortizacion = async (id) => {
+  const response = await api.get(`/obligaciones/deudas/${id}/amortizacion`);
+  return response.data;
+};
+
+export const obtenerProgresoMensual = async (mes) => {
+  const params = mes ? { mes } : {};
+  const response = await api.get('/obligaciones/progreso-mensual', { params });
+  return response.data;
+};
+
+// ===== MOVIMIENTOS (ASIGNACIÓN) =====
+export const obtenerMovimientosSinAsignar = async (mes) => {
+  const params = mes ? { mes } : {};
+  const response = await api.get('/movimientos/sin-asignar', { params });
+  return response.data;
+};
+
+export const asignarMovimiento = async (id, tipo, referenciaId) => {
+  const response = await api.put(`/movimientos/${id}/asignar`, { tipo, referenciaId });
+  return response.data;
+};
+
+export const desasignarMovimiento = async (id) => {
+  const response = await api.put(`/movimientos/${id}/desasignar`);
+  return response.data;
+};
+
+// ===== ESTADO FINANCIERO =====
+export const obtenerEstadoFinanciero = async (mes) => {
+  const params = mes ? { mes } : {};
+  const response = await api.get('/estado', { params });
   return response.data;
 };
 

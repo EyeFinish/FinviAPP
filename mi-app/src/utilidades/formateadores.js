@@ -72,18 +72,18 @@ export const obtenerInfoBanco = (institutionName = '') => {
   const nombre = (institutionName || '').toLowerCase();
 
   const bancos = [
-    { match: ['banco de chile', 'chile'], nombre: 'Banco de Chile', icono: '🔵', color: '#003DA6', colorClaro: '#e0edff' },
-    { match: ['estado', 'bancoestado'], nombre: 'BancoEstado', icono: '🟢', color: '#00A651', colorClaro: '#d4f5e2' },
-    { match: ['santander'], nombre: 'Santander', icono: '🔴', color: '#EC0000', colorClaro: '#ffe0e0' },
-    { match: ['bci'], nombre: 'BCI', icono: '🟠', color: '#FF6600', colorClaro: '#fff0e0' },
-    { match: ['scotiabank', 'scotia'], nombre: 'Scotiabank', icono: '🔴', color: '#EC111A', colorClaro: '#ffe0e2' },
-    { match: ['itau', 'itaú'], nombre: 'Itaú', icono: '🟠', color: '#FF6200', colorClaro: '#fff0e0' },
-    { match: ['falabella'], nombre: 'Banco Falabella', icono: '🟢', color: '#8CC63F', colorClaro: '#edf8d9' },
-    { match: ['bice'], nombre: 'BICE', icono: '🔵', color: '#002F6C', colorClaro: '#dde8f5' },
-    { match: ['security'], nombre: 'Banco Security', icono: '🔵', color: '#1B3A5C', colorClaro: '#dde5ee' },
-    { match: ['consorcio'], nombre: 'Consorcio', icono: '🟣', color: '#6B1F7C', colorClaro: '#f0e0f7' },
-    { match: ['ripley'], nombre: 'Banco Ripley', icono: '🟣', color: '#6D1076', colorClaro: '#f3e0f7' },
-    { match: ['internacional'], nombre: 'Banco Internacional', icono: '🔵', color: '#0055A4', colorClaro: '#e0edff' },
+    { match: ['banco de chile', 'chile'], nombre: 'Banco de Chile', color: '#003DA6', colorClaro: '#e0edff' },
+    { match: ['estado', 'bancoestado'], nombre: 'BancoEstado', color: '#00A651', colorClaro: '#d4f5e2' },
+    { match: ['santander'], nombre: 'Santander', color: '#EC0000', colorClaro: '#ffe0e0' },
+    { match: ['bci'], nombre: 'BCI', color: '#FF6600', colorClaro: '#fff0e0' },
+    { match: ['scotiabank', 'scotia'], nombre: 'Scotiabank', color: '#EC111A', colorClaro: '#ffe0e2' },
+    { match: ['itau', 'itaú'], nombre: 'Itaú', color: '#FF6200', colorClaro: '#fff0e0' },
+    { match: ['falabella'], nombre: 'Banco Falabella', color: '#8CC63F', colorClaro: '#edf8d9' },
+    { match: ['bice'], nombre: 'BICE', color: '#002F6C', colorClaro: '#dde8f5' },
+    { match: ['security'], nombre: 'Banco Security', color: '#1B3A5C', colorClaro: '#dde5ee' },
+    { match: ['consorcio'], nombre: 'Consorcio', color: '#6B1F7C', colorClaro: '#f0e0f7' },
+    { match: ['ripley'], nombre: 'Banco Ripley', color: '#6D1076', colorClaro: '#f3e0f7' },
+    { match: ['internacional'], nombre: 'Banco Internacional', color: '#0055A4', colorClaro: '#e0edff' },
   ];
 
   for (const banco of bancos) {
@@ -92,7 +92,7 @@ export const obtenerInfoBanco = (institutionName = '') => {
     }
   }
 
-  return { nombre: institutionName || 'Banco', icono: '🏦', color: '#6b7280', colorClaro: '#f3f4f6' };
+  return { nombre: institutionName || 'Banco', color: '#6b7280', colorClaro: '#f3f4f6' };
 };
 
 /**

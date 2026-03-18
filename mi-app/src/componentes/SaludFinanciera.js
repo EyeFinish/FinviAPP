@@ -1,4 +1,5 @@
 import { formatearMoneda } from '../utilidades/formateadores';
+import { Wallet, TrendingDown, Calendar } from 'lucide-react';
 
 function SaludFinanciera({ salud, balanceTotal, totalDeuda, cuotaMensualTotal }) {
   // Arco SVG para el indicador
@@ -18,7 +19,7 @@ function SaludFinanciera({ salud, balanceTotal, totalDeuda, cuotaMensualTotal })
             <circle
               cx="90" cy="90" r={radio}
               fill="none"
-              stroke="#e5e7eb"
+              stroke="#d8ddf5"
               strokeWidth="12"
               strokeDasharray={`${circunferencia * 0.75} ${circunferencia * 0.25}`}
               strokeLinecap="round"
@@ -47,7 +48,7 @@ function SaludFinanciera({ salud, balanceTotal, totalDeuda, cuotaMensualTotal })
         {/* Métricas */}
         <div className="salud-metricas">
           <div className="salud-metrica">
-            <div className="salud-metrica-icono positivo">💰</div>
+            <div className="salud-metrica-icono positivo"><Wallet size={20} /></div>
             <div>
               <div className="salud-metrica-label">Balance disponible</div>
               <div className="salud-metrica-valor positivo">
@@ -57,7 +58,7 @@ function SaludFinanciera({ salud, balanceTotal, totalDeuda, cuotaMensualTotal })
           </div>
 
           <div className="salud-metrica">
-            <div className="salud-metrica-icono negativo">📉</div>
+            <div className="salud-metrica-icono negativo"><TrendingDown size={20} /></div>
             <div>
               <div className="salud-metrica-label">Deuda total</div>
               <div className="salud-metrica-valor negativo">
@@ -67,7 +68,7 @@ function SaludFinanciera({ salud, balanceTotal, totalDeuda, cuotaMensualTotal })
           </div>
 
           <div className="salud-metrica">
-            <div className="salud-metrica-icono neutro">📅</div>
+            <div className="salud-metrica-icono neutro"><Calendar size={20} /></div>
             <div>
               <div className="salud-metrica-label">Compromiso mensual</div>
               <div className="salud-metrica-valor">
@@ -76,15 +77,7 @@ function SaludFinanciera({ salud, balanceTotal, totalDeuda, cuotaMensualTotal })
             </div>
           </div>
 
-          <div className="salud-metrica">
-            <div className="salud-metrica-icono neutro">⚖️</div>
-            <div>
-              <div className="salud-metrica-label">Patrimonio neto</div>
-              <div className={`salud-metrica-valor ${balanceTotal - totalDeuda >= 0 ? 'positivo' : 'negativo'}`}>
-                {formatearMoneda(balanceTotal - totalDeuda)}
-              </div>
-            </div>
-          </div>
+
         </div>
       </div>
     </div>

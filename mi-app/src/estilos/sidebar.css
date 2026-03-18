@@ -41,22 +41,33 @@
 }
 
 .sidebar-item:hover {
-  background-color: #f0fdf4;
+  background-color: #eef0fb;
   color: var(--color-texto);
 }
 
 .sidebar-item.activo {
-  background-color: #ecfdf5;
+  background-color: #e0d9ff;
   color: var(--color-primario);
   border-left-color: var(--color-primario);
   font-weight: 600;
 }
 
 .sidebar-item-icono {
-  font-size: 18px;
   width: 24px;
   text-align: center;
   flex-shrink: 0;
+  color: var(--color-texto-secundario);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-item.activo .sidebar-item-icono {
+  color: var(--color-primario);
+}
+
+.sidebar-item:hover .sidebar-item-icono {
+  color: var(--color-primario);
 }
 
 .sidebar-item-texto {

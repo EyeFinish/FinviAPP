@@ -1,7 +1,14 @@
 const mongoose = require('mongoose');
 
+const TIPOS_ROTATIVOS = ['tarjeta_credito', 'linea_credito'];
+
 const creditSchema = new mongoose.Schema(
   {
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
     nombre: {
       type: String,
       required: [true, 'El nombre del crédito es obligatorio'],
@@ -32,9 +39,10 @@ const creditSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    // Opcional para rotativos (no tienen cuotas fijas)
     cuotaMensual: {
       type: Number,
-      required: [true, 'La cuota mensual es obligatoria'],
+      default: 0,
       min: 0,
     },
     cuotasPagadas: {
@@ -42,18 +50,20 @@ const creditSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    // Opcional para rotativos
     cuotasTotales: {
       type: Number,
-      required: [true, 'El total de cuotas es obligatorio'],
-      min: 1,
+      default: 0,
+      min: 0,
     },
     fechaInicio: {
       type: Date,
-      required: [true, 'La fecha de inicio es obligatoria'],
+      default: null,
     },
+    // Opcional para rotativos (no tienen fecha de término)
     fechaVencimiento: {
       type: Date,
-      required: [true, 'La fecha de vencimiento es obligatoria'],
+      default: null,
     },
     estado: {
       type: String,
@@ -73,10 +83,43 @@ const creditSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // --- Patrones de pago detectados ---
+    patronesPago: {
+      type: [String],
+      default: [],
+    },
+    cuentaDestinoId: {
+      type: String,
+      default: null,
+    },
   },
   {
     timestamps: true,
   }
 );
+
+// Validación condicional: campos obligatorios solo para créditos en cuotas
+creditSchema.pre('validate', function () {
+  if (!TIPOS_ROTATIVOS.includes(this.tipoCredito)) {
+    if (!this.cuotaMensual || this.cuotaMensual <= 0) {
+      this.invalidate('cuotaMensual', 'La cuota mensual es obligatoria para créditos en cuotas');
+    }
+    if (!this.cuotasTotales || this.cuotasTotales < 1) {
+      this.invalidate('cuotasTotales', 'El total de cuotas es obligatorio para créditos en cuotas');
+    }
+    if (!this.fechaInicio) {
+      this.invalidate('fechaInicio', 'La fecha de inicio es obligatoria');
+    }
+    if (!this.fechaVencimiento) {
+      this.invalidate('fechaVencimiento', 'La fecha de vencimiento es obligatoria');
+    }
+  }
+});
+
+// Helper estático para verificar si un tipo es rotativo
+creditSchema.statics.TIPOS_ROTATIVOS = TIPOS_ROTATIVOS;
+creditSchema.methods.esRotativo = function () {
+  return TIPOS_ROTATIVOS.includes(this.tipoCredito);
+};
 
 module.exports = mongoose.model('Credit', creditSchema);

@@ -1,15 +1,19 @@
 import { useState, useMemo } from 'react';
 import { crearCredito } from '../servicios/api';
 import { formatearMoneda } from '../utilidades/formateadores';
+import { X, BarChart3, Loader, Save } from 'lucide-react';
 import '../estilos/formCredito.css';
 
-// Calcula meses entre dos fechas
-function calcularMesesEntre(fechaInicio, fechaFin) {
-  if (!fechaInicio || !fechaFin) return 0;
-  const inicio = new Date(fechaInicio);
-  const fin = new Date(fechaFin);
-  const meses = (fin.getFullYear() - inicio.getFullYear()) * 12 + (fin.getMonth() - inicio.getMonth());
-  return Math.max(meses, 0);
+const TIPOS_ROTATIVOS = ['tarjeta_credito', 'linea_credito'];
+
+// Cuota mensual con fórmula de amortización francesa: C = P * [r(1+r)^n] / [(1+r)^n - 1]
+function calcularCuotaMensual(monto, tasaAnual, cuotasTotales) {
+  if (!monto || !cuotasTotales || cuotasTotales <= 0) return 0;
+  if (!tasaAnual || tasaAnual <= 0) return monto / cuotasTotales;
+  const r = tasaAnual / 100 / 12;
+  const n = cuotasTotales;
+  const cuota = monto * (r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
+  return Math.round(cuota);
 }
 
 // Calcula meses transcurridos desde fecha inicio hasta hoy
@@ -21,33 +25,21 @@ function calcularMesesTranscurridos(fechaInicio) {
   return Math.max(meses, 0);
 }
 
-// Cuota mensual con fórmula de amortización francesa: C = P * [r(1+r)^n] / [(1+r)^n - 1]
-function calcularCuotaMensual(monto, tasaAnual, cuotasTotales) {
-  if (!monto || !cuotasTotales || cuotasTotales <= 0) return 0;
-  if (!tasaAnual || tasaAnual <= 0) return monto / cuotasTotales; // Sin interés
-  const r = tasaAnual / 100 / 12; // Tasa mensual
-  const n = cuotasTotales;
-  const cuota = monto * (r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
-  return Math.round(cuota);
-}
-
 // Saldo pendiente tras k cuotas pagadas
 function calcularSaldoPendiente(monto, tasaAnual, cuotasTotales, cuotasPagadas) {
   if (!monto || !cuotasTotales) return 0;
   if (cuotasPagadas >= cuotasTotales) return 0;
   if (!tasaAnual || tasaAnual <= 0) {
-    // Sin interés: saldo = monto - (monto/cuotasTotales * cuotasPagadas)
     return Math.max(Math.round(monto - (monto / cuotasTotales) * cuotasPagadas), 0);
   }
   const r = tasaAnual / 100 / 12;
   const n = cuotasTotales;
   const k = cuotasPagadas;
-  // Fórmula: Saldo = P * [(1+r)^n - (1+r)^k] / [(1+r)^n - 1]
   const saldo = monto * (Math.pow(1 + r, n) - Math.pow(1 + r, k)) / (Math.pow(1 + r, n) - 1);
   return Math.max(Math.round(saldo), 0);
 }
 
-function FormularioCredito({ onCreditoCreado, onCancelar }) {
+function FormularioCredito({ onCreditoCreado, onCancelar, bancos = [] }) {
   const [datos, setDatos] = useState({
     nombre: '',
     institucion: '',
@@ -55,25 +47,27 @@ function FormularioCredito({ onCreditoCreado, onCancelar }) {
     montoOriginal: '',
     tasaInteres: '',
     fechaInicio: '',
-    fechaVencimiento: '',
+    cuotasTotales: '',
     estado: 'activo',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Valores calculados automáticamente
+  const esRotativo = TIPOS_ROTATIVOS.includes(datos.tipoCredito);
+
+  // Valores calculados automáticamente (solo para créditos en cuotas)
   const calculados = useMemo(() => {
+    if (esRotativo) return null;
     const monto = Number(datos.montoOriginal) || 0;
     const tasa = Number(datos.tasaInteres) || 0;
-    const cuotasTotales = calcularMesesEntre(datos.fechaInicio, datos.fechaVencimiento);
+    const cuotasTotales = Number(datos.cuotasTotales) || 0;
     const cuotasPagadas = Math.min(calcularMesesTranscurridos(datos.fechaInicio), cuotasTotales);
     const cuotaMensual = calcularCuotaMensual(monto, tasa, cuotasTotales);
     const saldoPendiente = calcularSaldoPendiente(monto, tasa, cuotasTotales, cuotasPagadas);
     const totalAPagar = cuotaMensual * cuotasTotales;
     const costoInteres = totalAPagar - monto;
-
     return { cuotasTotales, cuotasPagadas, cuotaMensual, saldoPendiente, totalAPagar, costoInteres };
-  }, [datos.montoOriginal, datos.tasaInteres, datos.fechaInicio, datos.fechaVencimiento]);
+  }, [datos.montoOriginal, datos.tasaInteres, datos.fechaInicio, datos.cuotasTotales, esRotativo]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -85,22 +79,35 @@ function FormularioCredito({ onCreditoCreado, onCancelar }) {
     setLoading(true);
     setError(null);
 
-    if (calculados.cuotasTotales <= 0) {
-      setError('La fecha de vencimiento debe ser posterior a la fecha de inicio');
+    if (!esRotativo && (!calculados || calculados.cuotasTotales <= 0)) {
+      setError('Debes ingresar un número de cuotas mayor a 0');
       setLoading(false);
       return;
     }
 
     try {
-      const payload = {
-        ...datos,
-        montoOriginal: Number(datos.montoOriginal),
-        tasaInteres: Number(datos.tasaInteres) || 0,
-        saldoPendiente: calculados.saldoPendiente,
-        cuotaMensual: calculados.cuotaMensual,
-        cuotasPagadas: calculados.cuotasPagadas,
-        cuotasTotales: calculados.cuotasTotales,
-      };
+      let payload;
+      if (esRotativo) {
+        payload = {
+          nombre: datos.nombre,
+          institucion: datos.institucion,
+          tipoCredito: datos.tipoCredito,
+          estado: datos.estado,
+          montoOriginal: Number(datos.montoOriginal),
+          saldoPendiente: Number(datos.montoOriginal), // cupo = saldo inicial para rotativos
+          tasaInteres: Number(datos.tasaInteres) || 0,
+        };
+      } else {
+        payload = {
+          ...datos,
+          montoOriginal: Number(datos.montoOriginal),
+          tasaInteres: Number(datos.tasaInteres) || 0,
+          saldoPendiente: calculados.saldoPendiente,
+          cuotaMensual: calculados.cuotaMensual,
+          cuotasPagadas: calculados.cuotasPagadas,
+          cuotasTotales: calculados.cuotasTotales,
+        };
+      }
       const nuevo = await crearCredito(payload);
       onCreditoCreado(nuevo);
     } catch (err) {
@@ -111,14 +118,16 @@ function FormularioCredito({ onCreditoCreado, onCancelar }) {
     }
   };
 
-  const hayDatosSuficientes = Number(datos.montoOriginal) > 0 && datos.fechaInicio && datos.fechaVencimiento && calculados.cuotasTotales > 0;
+  const hayDatosSuficientes = esRotativo
+    ? Number(datos.montoOriginal) > 0
+    : Number(datos.montoOriginal) > 0 && datos.fechaInicio && Number(datos.cuotasTotales) > 0;
 
   return (
     <div className="form-credito-overlay">
       <div className="form-credito">
         <div className="form-credito-header">
           <h2 className="form-credito-titulo">Agregar Crédito</h2>
-          <button className="form-credito-cerrar" onClick={onCancelar}>✕</button>
+          <button className="form-credito-cerrar" onClick={onCancelar}><X size={18} /></button>
         </div>
 
         {error && (
@@ -137,22 +146,27 @@ function FormularioCredito({ onCreditoCreado, onCancelar }) {
                 value={datos.nombre}
                 onChange={handleChange}
                 className="form-input"
-                placeholder="Ej: Crédito de consumo Banco Estado"
+                placeholder={esRotativo ? 'Ej: Tarjeta Visa Banco Estado' : 'Ej: Crédito de consumo Banco Estado'}
                 required
               />
             </div>
 
             <div className="form-grupo">
               <label className="form-label">Institución financiera</label>
-              <input
-                type="text"
+              <select
                 name="institucion"
                 value={datos.institucion}
                 onChange={handleChange}
                 className="form-input"
-                placeholder="Ej: Banco Estado"
                 required
-              />
+              >
+                <option value="">Selecciona un banco</option>
+                {bancos.map((banco) => (
+                  <option key={banco._id} value={banco.institutionName}>
+                    {banco.institutionName}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="form-grupo">
@@ -189,14 +203,14 @@ function FormularioCredito({ onCreditoCreado, onCancelar }) {
             </div>
 
             <div className="form-grupo">
-              <label className="form-label">Monto original ($)</label>
+              <label className="form-label">{esRotativo ? 'Cupo total ($)' : 'Monto original ($)'}</label>
               <input
                 type="number"
                 name="montoOriginal"
                 value={datos.montoOriginal}
                 onChange={handleChange}
                 className="form-input"
-                placeholder="5000000"
+                placeholder={esRotativo ? '2000000' : '5000000'}
                 min="0"
                 required
               />
@@ -210,41 +224,48 @@ function FormularioCredito({ onCreditoCreado, onCancelar }) {
                 value={datos.tasaInteres}
                 onChange={handleChange}
                 className="form-input"
-                placeholder="12.5"
+                placeholder={esRotativo ? 'Opcional' : '12.5'}
                 min="0"
                 step="0.1"
               />
             </div>
 
-            <div className="form-grupo">
-              <label className="form-label">Fecha de inicio</label>
-              <input
-                type="date"
-                name="fechaInicio"
-                value={datos.fechaInicio}
-                onChange={handleChange}
-                className="form-input"
-                required
-              />
-            </div>
+            {/* Campos solo para créditos en cuotas */}
+            {!esRotativo && (
+              <>
+                <div className="form-grupo">
+                  <label className="form-label">Fecha de inicio</label>
+                  <input
+                    type="date"
+                    name="fechaInicio"
+                    value={datos.fechaInicio}
+                    onChange={handleChange}
+                    className="form-input"
+                    required
+                  />
+                </div>
 
-            <div className="form-grupo">
-              <label className="form-label">Fecha de vencimiento</label>
-              <input
-                type="date"
-                name="fechaVencimiento"
-                value={datos.fechaVencimiento}
-                onChange={handleChange}
-                className="form-input"
-                required
-              />
-            </div>
+                <div className="form-grupo">
+                  <label className="form-label">Número de cuotas</label>
+                  <input
+                    type="number"
+                    name="cuotasTotales"
+                    value={datos.cuotasTotales}
+                    onChange={handleChange}
+                    className="form-input"
+                    placeholder="Ej: 36"
+                    min="1"
+                    required
+                  />
+                </div>
+              </>
+            )}
           </div>
 
           {/* Vista previa de cálculos automáticos */}
-          {hayDatosSuficientes && (
+          {hayDatosSuficientes && !esRotativo && calculados && (
             <div className="form-credito-preview">
-              <h3 className="form-credito-preview-titulo">📊 Cálculo automático</h3>
+              <h3 className="form-credito-preview-titulo"><BarChart3 size={16} /> Cálculo automático</h3>
               <div className="form-credito-preview-grid">
                 <div className="form-credito-preview-item">
                   <span className="form-credito-preview-label">Cuotas totales</span>
@@ -274,12 +295,34 @@ function FormularioCredito({ onCreditoCreado, onCancelar }) {
             </div>
           )}
 
+          {/* Preview para rotativos */}
+          {hayDatosSuficientes && esRotativo && (
+            <div className="form-credito-preview">
+              <h3 className="form-credito-preview-titulo"><BarChart3 size={16} /> Resumen</h3>
+              <div className="form-credito-preview-grid">
+                <div className="form-credito-preview-item">
+                  <span className="form-credito-preview-label">Cupo total</span>
+                  <span className="form-credito-preview-valor">{formatearMoneda(Number(datos.montoOriginal))}</span>
+                </div>
+                {Number(datos.tasaInteres) > 0 && (
+                  <div className="form-credito-preview-item">
+                    <span className="form-credito-preview-label">Tasa anual</span>
+                    <span className="form-credito-preview-valor amarillo">{datos.tasaInteres}%</span>
+                  </div>
+                )}
+              </div>
+              <p className="form-credito-nota">
+                Los créditos rotativos no tienen cuotas fijas. La deuda y el disponible se actualizan automáticamente desde Fintoc.
+              </p>
+            </div>
+          )}
+
           <div className="form-credito-acciones">
             <button type="button" className="btn btn-secundario" onClick={onCancelar}>
               Cancelar
             </button>
             <button type="submit" className="btn btn-primario" disabled={loading}>
-              {loading ? '⏳ Guardando...' : '💾 Guardar crédito'}
+              {loading ? <><Loader size={14} className="icon-spin" /> Guardando...</> : <><Save size={14} /> Guardar crédito</>}
             </button>
           </div>
         </form>

@@ -88,7 +88,7 @@
 
 .cuenta-card:hover {
   box-shadow: var(--sombra-md);
-  border-color: #a7f3d0;
+  border-color: #b8c4ff;
 }
 
 .cuenta-card-header {
@@ -445,7 +445,7 @@
 
 .mensaje-exito {
   background-color: var(--color-primario-claro);
-  border: 1px solid #6ee7b7;
+  border: 1px solid #8fa0ff;
   border-radius: var(--radio-sm);
   padding: 16px;
   margin-bottom: 24px;
@@ -646,7 +646,7 @@
   align-items: center;
   gap: 12px;
   padding: 12px;
-  background-color: #f9fafb;
+  background-color: #f8f9fe;
   border-radius: var(--radio-md);
 }
 
@@ -663,7 +663,7 @@
 
 .salud-metrica-icono.positivo { background-color: #d1fae5; }
 .salud-metrica-icono.negativo { background-color: #fee2e2; }
-.salud-metrica-icono.neutro { background-color: #e0e7ff; }
+.salud-metrica-icono.neutro { background-color: #e0d9ff; }
 
 .salud-metrica-label {
   font-size: 12px;
@@ -804,7 +804,7 @@
   display: inline-block;
   font-size: 11px;
   color: var(--color-texto-secundario);
-  background-color: #f3f4f6;
+  background-color: #eef0fb;
   padding: 2px 8px;
   border-radius: var(--radio-full);
   margin-bottom: 12px;
@@ -864,14 +864,14 @@
 
 .credito-card-progreso-barra {
   height: 6px;
-  background-color: #e5e7eb;
+  background-color: #d8ddf5;
   border-radius: var(--radio-full);
   overflow: hidden;
 }
 
 .credito-card-progreso-relleno {
   height: 100%;
-  background: linear-gradient(90deg, var(--color-primario) 0%, #34d399 100%);
+  background: linear-gradient(90deg, var(--color-primario) 0%, var(--color-secundario, #5170ff) 100%);
   border-radius: var(--radio-full);
   transition: width 0.5s ease;
 }
@@ -895,7 +895,7 @@
   gap: 10px;
   margin-bottom: 16px;
   padding: 12px;
-  background-color: #f9fafb;
+  background-color: #f8f9fe;
   border-radius: var(--radio-md);
   border: 1px solid var(--color-borde-claro);
 }
@@ -946,6 +946,149 @@
 
 .credito-card-resumen-valor.restante {
   color: #ef4444;
+}
+
+/* ===== CRÉDITOS ROTATIVOS ===== */
+.credito-card-tipo-badge.rotativo {
+  background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+  color: #fff;
+}
+
+.rotativo-montos {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.credito-card-monto-valor.disponible {
+  color: #10b981;
+}
+
+/* ===== TRANSACCIONES EN TARJETA ===== */
+.credito-card-transacciones {
+  margin-top: 12px;
+  border-top: 1px solid var(--color-borde-claro);
+  padding-top: 8px;
+}
+
+.credito-card-txs-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: #5170ff;
+  padding: 4px 0;
+}
+
+.credito-card-txs-toggle:hover {
+  text-decoration: underline;
+}
+
+.credito-card-txs-lista {
+  margin-top: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.credito-card-txs-cargando,
+.credito-card-txs-vacio {
+  font-size: 12px;
+  color: var(--color-texto-secundario);
+  font-style: italic;
+  padding: 8px 0;
+}
+
+.credito-card-tx-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--color-borde-claro);
+}
+
+.credito-card-tx-item:last-child {
+  border-bottom: none;
+}
+
+.credito-card-tx-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.credito-card-tx-desc {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-texto);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.credito-card-tx-fecha {
+  font-size: 10px;
+  color: var(--color-texto-secundario);
+  margin-top: 1px;
+}
+
+.credito-card-tx-monto {
+  font-size: 13px;
+  font-weight: 700;
+  margin-left: 12px;
+  white-space: nowrap;
+}
+
+.credito-card-tx-monto.negativo {
+  color: #ef4444;
+}
+
+.credito-card-tx-monto.positivo {
+  color: #10b981;
+}
+
+/* ===== RESUMEN LÍNEA DE CRÉDITO (uso/pago) ===== */
+.credito-card-linea-resumen {
+  display: flex;
+  gap: 16px;
+  padding: 10px 14px;
+  background: #f8fafc;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.credito-card-linea-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: #64748b;
+  flex: 1;
+}
+
+.credito-card-linea-item strong {
+  margin-left: auto;
+  font-weight: 600;
+}
+
+.credito-card-linea-item.uso svg {
+  color: #ef4444;
+}
+
+.credito-card-linea-item.pago svg {
+  color: #10b981;
+}
+
+/* ===== NOTA FORMULARIO ROTATIVO ===== */
+.form-credito-nota {
+  font-size: 12px;
+  color: var(--color-texto-secundario);
+  margin-top: 8px;
+  font-style: italic;
 }
 
 /* ===== BTN SM ===== */
@@ -1012,7 +1155,7 @@
   background-color: var(--color-blanco);
   border-radius: var(--radio-md);
   border: 1px solid var(--color-borde);
-  border-left: 4px solid #6b7280;
+  border-left: 4px solid #555a7e;
   padding: 16px;
   transition: var(--transicion);
 }
@@ -1182,8 +1325,8 @@
 }
 
 .conexion-estado-active {
-  background-color: #d1fae5;
-  color: #065f46;
+  background-color: #e0d9ff;
+  color: #1800ad;
 }
 
 .conexion-estado-error {
@@ -1192,8 +1335,8 @@
 }
 
 .conexion-estado-inactive {
-  background-color: #f3f4f6;
-  color: #6b7280;
+  background-color: #eef0fb;
+  color: #555a7e;
 }
 
 .conexion-card-stats {

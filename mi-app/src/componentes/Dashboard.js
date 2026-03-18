@@ -1,15 +1,19 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { obtenerCuentas, refrescarDatos, obtenerResumenCreditos, eliminarCredito, obtenerConexiones, eliminarConexion, obtenerCreditosPendientes } from '../servicios/api';
+import {
+  obtenerCuentas, refrescarDatos, obtenerResumenCreditos, obtenerConexiones, eliminarConexion,
+  obtenerProgresoMensual, obtenerMovimientosSinAsignar, asignarMovimiento, desasignarMovimiento,
+  obtenerCostosFijos, obtenerDeudas,
+} from '../servicios/api';
+import { Building2, Link2, RefreshCw, Loader, AlertTriangle } from 'lucide-react';
 import TarjetaCuenta from '../componentes/TarjetaCuenta';
 import TablaMovimientos from '../componentes/TablaMovimientos';
-import TarjetaCredito from '../componentes/TarjetaCredito';
 import SaludFinanciera from '../componentes/SaludFinanciera';
-import FormularioCredito from '../componentes/FormularioCredito';
-import CompletarCredito from '../componentes/CompletarCredito';
-import FlujoCaja from '../componentes/FlujoCaja';
+import EstadoFinanciero from '../componentes/EstadoFinanciero';
+import ObligacionFinanciera from '../componentes/ObligacionFinanciera';
 import { formatearMoneda, traducirTipoCuenta, calcularSaludFinanciera, obtenerInfoBanco, agruparCuentasPorBanco } from '../utilidades/formateadores';
 import '../estilos/dashboard.css';
+import '../estilos/compromisos.css';
 
 function Dashboard({ seccion = 'dashboard' }) {
   const [cuentas, setCuentas] = useState([]); 
@@ -20,12 +24,24 @@ function Dashboard({ seccion = 'dashboard' }) {
 
   // Estado para créditos
   const [resumenCreditos, setResumenCreditos] = useState(null);
-  const [mostrarFormCredito, setMostrarFormCredito] = useState(false);
-  const [creditosPendientes, setCreditosPendientes] = useState([]);
-  const [creditoCompletar, setCreditoCompletar] = useState(null);
 
   // Estado para conexiones
   const [conexiones, setConexiones] = useState([]);
+
+  // Estado para compromisos mensuales
+  const [progreso, setProgreso] = useState(null);
+  const [sinAsignar, setSinAsignar] = useState([]);
+  const [obligacionesLista, setObligacionesLista] = useState([]);
+  const [seleccionAsignar, setSeleccionAsignar] = useState({}); // { movId: 'tipo_refId' }
+  const [asignando, setAsignando] = useState(null); // movId being assigned
+
+  // Totales combinados (créditos + obligaciones)
+  const [resumenOblig, setResumenOblig] = useState({ totalDeuda: 0, compromisoMensual: 0 });
+
+  const mesActual = () => {
+    const hoy = new Date();
+    return `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
+  };
 
   const cargarCuentas = useCallback(async () => {
     try {
@@ -62,12 +78,43 @@ function Dashboard({ seccion = 'dashboard' }) {
     }
   }, []);
 
-  const cargarPendientes = useCallback(async () => {
+  const cargarCompromisos = useCallback(async () => {
     try {
-      const data = await obtenerCreditosPendientes();
-      setCreditosPendientes(data);
+      const mes = mesActual();
+      const [resProgreso, resSinAsignar, resCostos, resDeudas] = await Promise.all([
+        obtenerProgresoMensual(mes).catch(() => null),
+        obtenerMovimientosSinAsignar(mes).catch(() => []),
+        obtenerCostosFijos().catch(() => []),
+        obtenerDeudas().catch(() => []),
+      ]);
+      setProgreso(resProgreso);
+      setSinAsignar(resSinAsignar || []);
+
+      // Datos crudos de obligaciones
+      const rawCostos = resCostos || [];
+      const rawDeudas = resDeudas || [];
+
+      // Calcular totales de obligaciones para cruce con Dashboard
+      // Deuda total = (montoTotal + interesTotal) proporcional a cuotas restantes
+      const deudaObligTotal = rawDeudas.reduce((s, d) => {
+        const restantes = (d.cuotasTotales || 0) - (d.cuotasPagadas || 0);
+        const total = d.cuotasTotales || 1;
+        const totalConInteres = (d.montoTotal || 0) + (d.interesTotal || 0);
+        return s + totalConInteres * (restantes / total);
+      }, 0);
+      const compromisoOblig = rawCostos.reduce((s, c) => s + (c.monto || 0), 0)
+        + rawDeudas.reduce((s, d) => s + (d.cuotaMensual || 0), 0);
+      setResumenOblig({ totalDeuda: deudaObligTotal, compromisoMensual: compromisoOblig });
+
+      const costos = rawCostos.map((c) => ({
+        _id: c._id, nombre: c.nombre, tipo: 'costoFijo', monto: c.monto,
+      }));
+      const deudas = rawDeudas.map((d) => ({
+        _id: d._id, nombre: d.nombre, tipo: 'deuda', monto: d.cuotaMensual,
+      }));
+      setObligacionesLista([...costos, ...deudas]);
     } catch (err) {
-      console.error('Error cargando créditos pendientes:', err);
+      console.error('Error cargando compromisos:', err);
     }
   }, []);
 
@@ -75,8 +122,8 @@ function Dashboard({ seccion = 'dashboard' }) {
     cargarCuentas();
     cargarCreditos();
     cargarConexiones();
-    cargarPendientes();
-  }, [cargarCuentas, cargarCreditos, cargarConexiones, cargarPendientes, seccion]);
+    cargarCompromisos();
+  }, [cargarCuentas, cargarCreditos, cargarConexiones, cargarCompromisos, seccion]);
 
   const handleRefrescar = async () => {
     try {
@@ -84,6 +131,7 @@ function Dashboard({ seccion = 'dashboard' }) {
       await refrescarDatos();
       await cargarCuentas();
       await cargarCreditos();
+      await cargarCompromisos();
     } catch (err) {
       console.error('Error refrescando datos:', err);
       setError(err.response?.data?.message || 'Error al actualizar los datos');
@@ -96,21 +144,6 @@ function Dashboard({ seccion = 'dashboard' }) {
     setCuentaSeleccionada(cuenta);
   };
 
-  const handleCreditoCreado = () => {
-    setMostrarFormCredito(false);
-    cargarCreditos();
-  };
-
-  const handleEliminarCredito = async (id) => {
-    if (!window.confirm('¿Estás seguro de eliminar este crédito?')) return;
-    try {
-      await eliminarCredito(id);
-      cargarCreditos();
-    } catch (err) {
-      console.error('Error eliminando crédito:', err);
-    }
-  };
-
   const handleEliminarConexion = async (linkId) => {
     if (!window.confirm('¿Deseas desconectar este banco? Se eliminarán las cuentas y movimientos asociados.')) return;
     try {
@@ -119,6 +152,31 @@ function Dashboard({ seccion = 'dashboard' }) {
       cargarCuentas();
     } catch (err) {
       console.error('Error eliminando conexión:', err);
+    }
+  };
+
+  const handleAsignar = async (movId) => {
+    const valor = seleccionAsignar[movId];
+    if (!valor) return;
+    const [tipo, referenciaId] = valor.split('_');
+    setAsignando(movId);
+    try {
+      await asignarMovimiento(movId, tipo, referenciaId);
+      setSeleccionAsignar((prev) => { const n = { ...prev }; delete n[movId]; return n; });
+      await cargarCompromisos();
+    } catch (err) {
+      console.error('Error asignando:', err);
+    } finally {
+      setAsignando(null);
+    }
+  };
+
+  const handleDesasignar = async (movId) => {
+    try {
+      await desasignarMovimiento(movId);
+      await cargarCompromisos();
+    } catch (err) {
+      console.error('Error desasignando:', err);
     }
   };
 
@@ -145,7 +203,7 @@ function Dashboard({ seccion = 'dashboard' }) {
   if (cuentas.length === 0 && !error && seccion === 'dashboard') {
     return (
       <div className="estado-vacio">
-        <div className="estado-vacio-icono">🏦</div>
+        <div className="estado-vacio-icono"><Building2 size={48} /></div>
         <h2 className="estado-vacio-titulo">No hay bancos conectados</h2>
         <p className="estado-vacio-texto">
           Conecta tu primera cuenta bancaria para comenzar a visualizar tus finanzas.
@@ -172,7 +230,7 @@ function Dashboard({ seccion = 'dashboard' }) {
               disabled={refrescando}
               className="btn btn-secundario"
             >
-              {refrescando ? '⏳ Actualizando...' : '🔄 Actualizar'}
+              {refrescando ? <><Loader size={16} className="icon-spin" /> Actualizando...</> : <><RefreshCw size={16} /> Actualizar</>}
             </button>
           </div>
         </div>
@@ -186,12 +244,12 @@ function Dashboard({ seccion = 'dashboard' }) {
         <SaludFinanciera
           salud={calcularSaludFinanciera(
             balanceTotal,
-            resumenCreditos?.totalDeuda || 0,
-            resumenCreditos?.cuotaMensualTotal || 0
+            (resumenCreditos?.totalDeuda || 0) + resumenOblig.totalDeuda,
+            (resumenCreditos?.cuotaMensualTotal || 0) + resumenOblig.compromisoMensual
           )}
           balanceTotal={balanceTotal}
-          totalDeuda={resumenCreditos?.totalDeuda || 0}
-          cuotaMensualTotal={resumenCreditos?.cuotaMensualTotal || 0}
+          totalDeuda={(resumenCreditos?.totalDeuda || 0) + resumenOblig.totalDeuda}
+          cuotaMensualTotal={(resumenCreditos?.cuotaMensualTotal || 0) + resumenOblig.compromisoMensual}
         />
 
         <div className="resumen-cards">
@@ -205,13 +263,24 @@ function Dashboard({ seccion = 'dashboard' }) {
           <div className="deuda-total">
             <div className="deuda-total-label">Deuda total</div>
             <div className="deuda-total-monto">
-              {formatearMoneda(resumenCreditos?.totalDeuda || 0)}
+              {formatearMoneda((resumenCreditos?.totalDeuda || 0) + resumenOblig.totalDeuda)}
             </div>
             <div className="deuda-total-info">
-              {resumenCreditos?.totalCreditosActivos || 0} crédito{(resumenCreditos?.totalCreditosActivos || 0) !== 1 ? 's' : ''} activo{(resumenCreditos?.totalCreditosActivos || 0) !== 1 ? 's' : ''}
+              {resumenCreditos?.totalCreditosActivos || 0} crédito{(resumenCreditos?.totalCreditosActivos || 0) !== 1 ? 's' : ''}
+              {resumenOblig.totalDeuda > 0 && <span> + deudas registradas</span>}
               {(resumenCreditos?.totalCreditosMorosos || 0) > 0 && (
-                <span className="alerta-moroso"> · ⚠️ {resumenCreditos.totalCreditosMorosos} moroso{resumenCreditos.totalCreditosMorosos !== 1 ? 's' : ''}</span>
+                <span className="alerta-moroso"> · <AlertTriangle size={14} /> {resumenCreditos.totalCreditosMorosos} moroso{resumenCreditos.totalCreditosMorosos !== 1 ? 's' : ''}</span>
               )}
+            </div>
+          </div>
+          <div className="deuda-total" style={{ borderLeftColor: '#5170ff' }}>
+            <div className="deuda-total-label">Compromiso mensual</div>
+            <div className="deuda-total-monto" style={{ color: '#5170ff' }}>
+              {formatearMoneda((resumenCreditos?.cuotaMensualTotal || 0) + resumenOblig.compromisoMensual)}
+            </div>
+            <div className="deuda-total-info">
+              {resumenOblig.compromisoMensual > 0 && <span>Costos fijos + cuotas deudas</span>}
+              {(resumenCreditos?.cuotaMensualTotal || 0) > 0 && <span>{resumenOblig.compromisoMensual > 0 ? ' + ' : ''}Cuotas créditos</span>}
             </div>
           </div>
         </div>
@@ -229,7 +298,7 @@ function Dashboard({ seccion = 'dashboard' }) {
                 >
                   <div className="banco-mini-card-header">
                     <span className="banco-mini-card-icono" style={{ backgroundColor: grupo.infoBanco.colorClaro }}>
-                      {grupo.infoBanco.icono}
+                      <Building2 size={18} />
                     </span>
                     <span className="banco-mini-card-nombre">{grupo.infoBanco.nombre}</span>
                   </div>
@@ -243,154 +312,178 @@ function Dashboard({ seccion = 'dashboard' }) {
           </div>
         )}
 
-        {mostrarFormCredito && (
-          <FormularioCredito
-            onCreditoCreado={handleCreditoCreado}
-            onCancelar={() => setMostrarFormCredito(false)}
-          />
+        {/* ====== COMPROMISOS DEL MES ====== */}
+        {progreso && (
+          <div className="compromisos-seccion">
+            <div className="compromisos-header">
+              <h3 className="compromisos-titulo">Compromisos del Mes</h3>
+              <span className="compromisos-badge">{progreso.porcentajeGeneral}% cumplido</span>
+            </div>
+
+            <div className="progreso-general">
+              <div className="progreso-general-header">
+                <span className="progreso-general-label">Progreso general</span>
+                <span className="progreso-general-valor">
+                  {formatearMoneda(progreso.totalPagado)} / {formatearMoneda(progreso.totalComprometido)}
+                </span>
+              </div>
+              <div className="barra-fondo">
+                <div
+                  className="barra-progreso"
+                  style={{
+                    width: `${progreso.porcentajeGeneral}%`,
+                    backgroundColor: progreso.porcentajeGeneral >= 100 ? '#10b981' : '#1800ad',
+                  }}
+                />
+              </div>
+            </div>
+
+            {progreso.obligaciones.length > 0 && (
+              <div className="obligaciones-grid">
+                {progreso.obligaciones.map((ob) => (
+                  <div key={`${ob.tipo}_${ob._id}`} className={`obligacion-card ${ob.tipo === 'costoFijo' ? 'costo-fijo' : 'deuda'}`}>
+                    <div className="obligacion-card-header">
+                      <div>
+                        <div className="obligacion-card-nombre">{ob.nombre}</div>
+                        <div className="obligacion-card-tipo">
+                          {ob.tipo === 'costoFijo' ? `Costo fijo · ${ob.categoria || ''}` : 'Deuda'}
+                        </div>
+                      </div>
+                      <span
+                        className="obligacion-card-porcentaje"
+                        style={{
+                          backgroundColor: ob.porcentaje >= 100 ? '#d1fae5' : ob.porcentaje >= 50 ? '#fef3c7' : '#fef2f2',
+                          color: ob.porcentaje >= 100 ? '#065f46' : ob.porcentaje >= 50 ? '#92400e' : '#991b1b',
+                        }}
+                      >
+                        {ob.porcentaje}%
+                      </span>
+                    </div>
+                    <div className="barra-fondo-sm">
+                      <div
+                        className="barra-progreso"
+                        style={{
+                          width: `${ob.porcentaje}%`,
+                          backgroundColor: ob.porcentaje >= 100 ? '#10b981' : ob.porcentaje >= 50 ? '#f59e0b' : '#ef4444',
+                        }}
+                      />
+                    </div>
+                    <div className="obligacion-card-montos">
+                      <span>Pagado: <strong>{formatearMoneda(ob.montoPagado)}</strong></span>
+                      <span>Objetivo: <strong>{formatearMoneda(ob.montoObjetivo)}</strong></span>
+                    </div>
+
+                    {ob.movimientos.length > 0 && (
+                      <div className="obligacion-movs">
+                        {ob.movimientos.map((mov) => (
+                          <div key={mov._id} className="obligacion-mov-item">
+                            <span className="mov-desc">{mov.description || 'Sin descripción'}</span>
+                            <span className="mov-monto">{formatearMoneda(Math.abs(mov.amount))}</span>
+                            <button className="btn-desasignar-sm" onClick={() => handleDesasignar(mov._id)} title="Quitar asignación">✕</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
-      </div>
-    );
-  }
 
-  // ===== SECCIÓN: CRÉDITOS =====
-  if (seccion === 'creditos') {
-    return (
-      <div className="dashboard">
-        <div className="dashboard-header">
-          <div>
-            <h1 className="dashboard-titulo">Créditos activos</h1>
-            <p className="dashboard-subtitulo">Gestiona tus créditos y deudas</p>
-          </div>
-          <div className="dashboard-acciones">
-            <button
-              className="btn btn-primario"
-              onClick={() => setMostrarFormCredito(true)}
-            >
-              + Agregar crédito
-            </button>
-          </div>
-        </div>
-
-        {/* Banner de créditos pendientes de completar */}
-        {creditosPendientes.length > 0 && (
-          <div className="pendientes-banner">
-            <div className="pendientes-banner-icono">🔔</div>
-            <div className="pendientes-banner-contenido">
-              <strong>Se detectaron {creditosPendientes.length} tarjeta{creditosPendientes.length > 1 ? 's' : ''} importada{creditosPendientes.length > 1 ? 's' : ''} desde Fintoc</strong>
-              <p>Completa los datos de interés y plazos para incluirlas en tu flujo de caja y proyecciones.</p>
+        {/* ====== TRANSACCIONES SIN ASIGNAR ====== */}
+        {sinAsignar.length > 0 && (
+          <div className="sin-asignar-seccion">
+            <div className="compromisos-header">
+              <h3 className="compromisos-titulo">Transacciones sin asignar</h3>
+              <span className="compromisos-badge alerta">{sinAsignar.length}</span>
             </div>
-            <div className="pendientes-banner-acciones">
-              {creditosPendientes.map((c) => (
-                <button
-                  key={c._id}
-                  className="btn btn-pendiente"
-                  onClick={() => setCreditoCompletar(c)}
-                >
-                  Completar {c.nombre}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div className="resumen-cards">
-          <div className="deuda-total">
-            <div className="deuda-total-label">Deuda total</div>
-            <div className="deuda-total-monto">
-              {formatearMoneda(resumenCreditos?.totalDeuda || 0)}
-            </div>
-            <div className="deuda-total-info">
-              {resumenCreditos?.totalCreditosActivos || 0} crédito{(resumenCreditos?.totalCreditosActivos || 0) !== 1 ? 's' : ''} activo{(resumenCreditos?.totalCreditosActivos || 0) !== 1 ? 's' : ''}
-            </div>
-          </div>
-          <div className="balance-total" style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)' }}>
-            <div className="balance-total-label">Total pagado</div>
-            <div className="balance-total-monto">
-              {formatearMoneda(resumenCreditos?.totalPagadoGlobal || 0)}
-            </div>
-            <div className="balance-total-info">
-              En cuotas hasta la fecha
-            </div>
-          </div>
-          <div className="balance-total" style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' }}>
-            <div className="balance-total-label">Total a pagar (con interés)</div>
-            <div className="balance-total-monto">
-              {formatearMoneda(resumenCreditos?.totalAPagarGlobal || 0)}
-            </div>
-            <div className="balance-total-info">
-              Costo interés: {formatearMoneda(resumenCreditos?.costoInteresGlobal || 0)}
-            </div>
-          </div>
-          <div className="balance-total" style={{ background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)' }}>
-            <div className="balance-total-label">Cuota mensual total</div>
-            <div className="balance-total-monto">
-              {formatearMoneda(resumenCreditos?.cuotaMensualTotal || 0)}
-            </div>
-            <div className="balance-total-info">
-              Progreso promedio: {resumenCreditos?.progresoPromedio || 0}%
-            </div>
-          </div>
-        </div>
-
-        {resumenCreditos?.creditos?.length > 0 ? (
-          <div className="creditos-grid">
-            {resumenCreditos.creditos.map((credito) => (
-              <TarjetaCredito
-                key={credito.id}
-                credito={credito}
-                onEliminar={handleEliminarCredito}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="creditos-vacio">
-            <div className="creditos-vacio-icono">💳</div>
-            <p className="creditos-vacio-texto">
-              No tienes créditos registrados. Agrega tus créditos para ver tu salud financiera completa.
+            <p className="sin-asignar-subtitulo">
+              Selecciona a qué obligación pertenece cada transacción para llevar el control de tus pagos.
             </p>
-            <button
-              className="btn btn-primario"
-              onClick={() => setMostrarFormCredito(true)}
-            >
-              + Agregar mi primer crédito
-            </button>
+            <table className="sin-asignar-tabla">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Descripción</th>
+                  <th>Monto</th>
+                  <th>Asignar a</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sinAsignar.slice(0, 20).map((mov) => (
+                  <tr key={mov._id}>
+                    <td>{mov.postDate ? new Date(mov.postDate).toLocaleDateString('es-CL') : '-'}</td>
+                    <td>{mov.description || 'Sin descripción'}</td>
+                    <td className="sin-asignar-monto">{formatearMoneda(Math.abs(mov.amount))}</td>
+                    <td>
+                      <div className="td-asignar">
+                        <select
+                          className="select-obligacion"
+                          value={seleccionAsignar[mov._id] || ''}
+                          onChange={(e) => setSeleccionAsignar((prev) => ({ ...prev, [mov._id]: e.target.value }))}
+                        >
+                          <option value="">-- Seleccionar --</option>
+                          <optgroup label="Costos Fijos">
+                            {obligacionesLista.filter((o) => o.tipo === 'costoFijo').map((o) => (
+                              <option key={o._id} value={`costoFijo_${o._id}`}>
+                                {o.nombre} ({formatearMoneda(o.monto)})
+                              </option>
+                            ))}
+                          </optgroup>
+                          <optgroup label="Deudas">
+                            {obligacionesLista.filter((o) => o.tipo === 'deuda').map((o) => (
+                              <option key={o._id} value={`deuda_${o._id}`}>
+                                {o.nombre} ({formatearMoneda(o.monto)})
+                              </option>
+                            ))}
+                          </optgroup>
+                        </select>
+                        <button
+                          className="btn-asignar"
+                          disabled={!seleccionAsignar[mov._id] || asignando === mov._id}
+                          onClick={() => handleAsignar(mov._id)}
+                        >
+                          {asignando === mov._id ? '...' : 'Asignar'}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {sinAsignar.length > 20 && (
+              <p style={{ textAlign: 'center', color: '#555a7e', fontSize: '13px', marginTop: '12px' }}>
+                y {sinAsignar.length - 20} transacciones más...
+              </p>
+            )}
           </div>
         )}
 
-        {mostrarFormCredito && (
-          <FormularioCredito
-            onCreditoCreado={handleCreditoCreado}
-            onCancelar={() => setMostrarFormCredito(false)}
-          />
-        )}
-
-        {creditoCompletar && (
-          <CompletarCredito
-            credito={creditoCompletar}
-            onCompletado={() => {
-              setCreditoCompletar(null);
-              cargarCreditos();
-              cargarPendientes();
-            }}
-            onCancelar={() => setCreditoCompletar(null)}
-          />
-        )}
       </div>
     );
   }
 
-  // ===== SECCIÓN: FLUJO DE CAJA =====
-  if (seccion === 'flujo-caja') {
+  // ===== SECCIÓN: ESTADO FINANCIERO =====
+  if (seccion === 'estado') {
     return (
       <div className="dashboard">
         <div className="dashboard-header">
           <div>
-            <h1 className="dashboard-titulo">Flujo de caja</h1>
-            <p className="dashboard-subtitulo">Proyección mes a mes de tus pagos y deudas</p>
+            <h1 className="dashboard-titulo">Estado financiero</h1>
+            <p className="dashboard-subtitulo">Tu realidad financiera actual</p>
           </div>
         </div>
-        <FlujoCaja />
+        <EstadoFinanciero />
+      </div>
+    );
+  }
+
+  // ===== SECCIÓN: OBLIGACIÓN FINANCIERA =====
+  if (seccion === 'obligaciones') {
+    return (
+      <div className="dashboard">
+        <ObligacionFinanciera />
       </div>
     );
   }
@@ -410,7 +503,7 @@ function Dashboard({ seccion = 'dashboard' }) {
               disabled={refrescando}
               className="btn btn-secundario"
             >
-              {refrescando ? '⏳ Actualizando...' : '🔄 Actualizar'}
+              {refrescando ? <><Loader size={16} className="icon-spin" /> Actualizando...</> : <><RefreshCw size={16} /> Actualizar</>}
             </button>
             <Link to="/conectar" className="btn btn-primario">
               + Conectar otro banco
@@ -442,7 +535,7 @@ function Dashboard({ seccion = 'dashboard' }) {
                       className="banco-grupo-icono"
                       style={{ backgroundColor: grupo.infoBanco.colorClaro, color: grupo.infoBanco.color }}
                     >
-                      {grupo.infoBanco.icono}
+                      <Building2 size={20} />
                     </span>
                     <div>
                       <div className="banco-grupo-nombre">{grupo.infoBanco.nombre}</div>
@@ -493,7 +586,7 @@ function Dashboard({ seccion = 'dashboard' }) {
           </>
         ) : (
           <div className="estado-vacio">
-            <div className="estado-vacio-icono">🏦</div>
+            <div className="estado-vacio-icono"><Building2 size={48} /></div>
             <h2 className="estado-vacio-titulo">No hay bancos conectados</h2>
             <p className="estado-vacio-texto">
               Conecta tu primera cuenta bancaria para ver tus saldos y movimientos.
@@ -535,7 +628,7 @@ function Dashboard({ seccion = 'dashboard' }) {
                         className="conexion-card-icono"
                         style={{ backgroundColor: infoBanco.colorClaro, color: infoBanco.color }}
                       >
-                        {infoBanco.icono}
+                        <Building2 size={20} />
                       </span>
                       <div>
                         <div className="conexion-card-nombre">{infoBanco.nombre}</div>
@@ -575,7 +668,7 @@ function Dashboard({ seccion = 'dashboard' }) {
           </div>
         ) : (
           <div className="estado-vacio">
-            <div className="estado-vacio-icono">🔗</div>
+            <div className="estado-vacio-icono"><Link2 size={48} /></div>
             <h2 className="estado-vacio-titulo">Sin conexiones bancarias</h2>
             <p className="estado-vacio-texto">
               Conecta tu primera cuenta bancaria para comenzar a gestionar tus finanzas.
