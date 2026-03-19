@@ -37,27 +37,14 @@ export const loginUsuario = (datos) => api.post('/auth/login', datos);
 export const obtenerUsuarioActual = () => api.get('/auth/me');
 
 // ============ FINTOC / CUENTAS ============
+export const crearLinkIntent = () => api.post('/fintoc/link-intent');
+export const intercambiarToken = (exchangeToken) => api.post('/fintoc/exchange', { exchangeToken });
 export const obtenerCuentas = () => api.get('/fintoc/accounts');
 export const obtenerMovimientos = (accountId) => api.get(`/fintoc/accounts/${accountId}/movements`);
 export const obtenerConexiones = () => api.get('/fintoc/links');
 export const refrescarDatos = () => api.post('/fintoc/refresh');
 export const resincronizarDatos = () => api.post('/fintoc/resync');
 
-// ============ CRÉDITOS ============
-export const obtenerResumenCreditos = () => api.get('/creditos/resumen');
-export const obtenerProyeccionCreditos = () => api.get('/creditos/proyeccion');
-export const obtenerCreditosPendientes = () => api.get('/creditos/pendientes');
-export const obtenerCreditos = (estado) => api.get('/creditos', { params: estado ? { estado } : {} });
-export const crearCredito = (datos) => api.post('/creditos', datos);
-export const actualizarCredito = (id, datos) => api.put(`/creditos/${id}`, datos);
-export const eliminarCredito = (id) => api.delete(`/creditos/${id}`);
-
-// ============ PAGOS DE CRÉDITOS (detección automática) ============
-export const obtenerPagosSinVincular = () => api.get('/creditos/pagos-sin-vincular');
-export const obtenerPagosDetectados = (creditoId) => api.get(`/creditos/${creditoId}/pagos-detectados`);
-export const confirmarPagoCredito = (creditoId, movimientoId) => api.post(`/creditos/${creditoId}/confirmar-pago`, { movimientoId });
-export const desvincularPagoCredito = (creditoId, movimientoId) => api.post(`/creditos/${creditoId}/desvincular-pago`, { movimientoId });
-export const obtenerTransaccionesCredito = (creditoId) => api.get(`/creditos/${creditoId}/transacciones`);
 // ============ OBLIGACIONES FINANCIERAS ============
 export const obtenerResumenObligaciones = () => api.get('/obligaciones/resumen');
 export const obtenerIngresos = () => api.get('/obligaciones/ingresos');
@@ -82,10 +69,17 @@ export const desasignarMovimiento = (id) => api.put(`/movimientos/${id}/desasign
 
 // ============ ESTADO FINANCIERO ============
 export const obtenerEstadoFinanciero = (mes) => api.get('/estado', { params: mes ? { mes } : {} });
+export const obtenerCategoriasDisponibles = () => api.get('/estado/categorias');
+export const categorizarMovimiento = (descripcion, categoria) => api.post('/estado/categorizar', { descripcion, categoria });
 
 // ============ NOTIFICACIONES ============
 export const registrarPushToken = (token) => api.post('/notifications/register-token', { token });
 export const obtenerNotificaciones = () => api.get('/notifications');
 export const marcarNotificacionLeida = (id) => api.put(`/notifications/${id}/read`);
+
+// ============ CONFIGURACIÓN / PERFIL ============
+export const actualizarPerfil = (datos) => api.put('/auth/perfil', datos);
+export const cambiarPassword = (datos) => api.put('/auth/password', datos);
+export const eliminarCuentaAPI = (password) => api.delete('/auth/cuenta', { data: { password } });
 
 export default api;

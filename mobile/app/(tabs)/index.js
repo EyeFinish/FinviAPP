@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
 import { useAuth } from '../../contexts/AuthContext';
 import {
-  obtenerCuentas, obtenerResumenCreditos,
+  obtenerCuentas,
   obtenerProgresoMensual, obtenerMovimientosSinAsignar,
   asignarMovimiento, desasignarMovimiento,
   obtenerCostosFijos, obtenerDeudas,
@@ -17,24 +17,26 @@ import { formatearMoneda, formatearFecha, calcularSaludFinanciera } from '../../
 import { Colors, Spacing, FontSize, BorderRadius } from '../../constants/theme';
 
 function IndicadorSalud({ puntaje, nivel, color }) {
-  const radius = 60;
-  const strokeWidth = 10;
+  const radius = 36;
+  const strokeWidth = 7;
   const circumference = 2 * Math.PI * radius;
   const progress = (puntaje / 100) * circumference;
+  const size = 90;
+  const center = size / 2;
 
   return (
     <View style={styles.saludContainer}>
-      <Svg width={150} height={150}>
+      <Svg width={size} height={size}>
         <Circle
-          cx={75} cy={75} r={radius}
+          cx={center} cy={center} r={radius}
           stroke={Colors.borde} strokeWidth={strokeWidth} fill="none"
         />
         <Circle
-          cx={75} cy={75} r={radius}
+          cx={center} cy={center} r={radius}
           stroke={color} strokeWidth={strokeWidth} fill="none"
           strokeDasharray={`${progress} ${circumference}`}
           strokeLinecap="round"
-          transform="rotate(-90 75 75)"
+          transform={`rotate(-90 ${center} ${center})`}
         />
       </Svg>
       <View style={styles.saludTexto}>
@@ -46,9 +48,8 @@ function IndicadorSalud({ puntaje, nivel, color }) {
 }
 
 export default function Dashboard() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [cuentas, setCuentas] = useState([]);
-  const [resumen, setResumen] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [refrescando, setRefrescando] = useState(false);
 
@@ -73,16 +74,14 @@ export default function Dashboard() {
   const cargarDatos = async () => {
     try {
       const mes = mesActual();
-      const [resCuentas, resCreditos, resProgreso, resSinAsignar, resCostos, resDeudas] = await Promise.all([
+      const [resCuentas, resProgreso, resSinAsignar, resCostos, resDeudas] = await Promise.all([
         obtenerCuentas().catch(() => ({ data: [] })),
-        obtenerResumenCreditos().catch(() => ({ data: null })),
         obtenerProgresoMensual(mes).catch(() => ({ data: null })),
         obtenerMovimientosSinAsignar(mes).catch(() => ({ data: [] })),
         obtenerCostosFijos().catch(() => ({ data: [] })),
         obtenerDeudas().catch(() => ({ data: [] })),
       ]);
       setCuentas(resCuentas.data || []);
-      setResumen(resCreditos.data);
       setProgreso(resProgreso.data);
       setSinAsignar(resSinAsignar.data || []);
 
@@ -135,8 +134,8 @@ export default function Dashboard() {
     (sum, c) => sum + (c.balance?.available || c.balance?.current || 0), 0
   );
   // Totales combinados: créditos (Fintoc) + obligaciones (manuales)
-  const totalDeuda = (resumen?.totalDeuda || 0) + resumenOblig.totalDeuda;
-  const compromisoMensual = (resumen?.cuotaMensualTotal || 0) + resumenOblig.compromisoMensual;
+  const totalDeuda = resumenOblig.totalDeuda;
+  const compromisoMensual = resumenOblig.compromisoMensual;
   const salud = calcularSaludFinanciera(balanceTotal, totalDeuda, compromisoMensual);
 
   const handleAbrirAsignacion = (movimiento) => {
@@ -187,52 +186,49 @@ export default function Dashboard() {
           <Text style={styles.saludo}>Hola, {user?.nombre?.split(' ')[0]} 👋</Text>
           <Text style={styles.subtitulo}>Tu resumen financiero</Text>
         </View>
-        <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
-          <Ionicons name="log-out-outline" size={24} color={Colors.textoSecundario} />
-        </TouchableOpacity>
       </View>
 
-      {/* Salud Financiera */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitulo}>Salud Financiera</Text>
-        <IndicadorSalud puntaje={salud.puntaje} nivel={salud.nivel} color={salud.color} />
-      </View>
-
-      {/* Balance y Deuda */}
-      <View style={styles.row}>
-        <View style={[styles.miniCard, { flex: 1 }]}>
-          <Ionicons name="wallet-outline" size={24} color={Colors.exito} />
-          <Text style={styles.miniLabel}>Balance Total</Text>
-          <Text style={[styles.miniValor, { color: balanceTotal >= 0 ? Colors.exito : Colors.error }]}>
+      {/* Resumen compacto: Salud + métricas en grid */}
+      <View style={styles.resumenGrid}>
+        {/* Salud Financiera */}
+        <View style={[styles.gridItem, { flex: 1 }]}>
+          <IndicadorSalud puntaje={salud.puntaje} nivel={salud.nivel} color={salud.color} />
+          <Text style={styles.gridLabel}>Salud</Text>
+        </View>
+        {/* Balance */}
+        <View style={[styles.gridItem, { flex: 1 }]}>
+          <Ionicons name="wallet-outline" size={20} color={Colors.exito} />
+          <Text style={styles.gridLabel}>Balance</Text>
+          <Text style={[styles.gridValor, { color: balanceTotal >= 0 ? Colors.exito : Colors.error }]}>
             {formatearMoneda(balanceTotal)}
           </Text>
         </View>
-        <View style={{ width: 12 }} />
-        <View style={[styles.miniCard, { flex: 1 }]}>
-          <Ionicons name="card-outline" size={24} color={Colors.error} />
-          <Text style={styles.miniLabel}>Deuda Total</Text>
-          <Text style={[styles.miniValor, { color: Colors.error }]}>
+        {/* Deuda */}
+        <View style={[styles.gridItem, { flex: 1 }]}>
+          <Ionicons name="card-outline" size={20} color={Colors.error} />
+          <Text style={styles.gridLabel}>Deuda</Text>
+          <Text style={[styles.gridValor, { color: Colors.error }]}>
             {formatearMoneda(totalDeuda)}
           </Text>
         </View>
       </View>
 
-      {/* Métricas adicionales */}
-      <View style={styles.row}>
-        <View style={[styles.miniCard, { flex: 1 }]}>
-          <Ionicons name="calendar-outline" size={24} color={Colors.secundario} />
-          <Text style={styles.miniLabel}>Compromiso Mensual</Text>
-          <Text style={styles.miniValor}>{formatearMoneda(compromisoMensual)}</Text>
+      <View style={styles.resumenGrid}>
+        {/* Compromiso */}
+        <View style={[styles.gridItem, { flex: 1 }]}>
+          <Ionicons name="calendar-outline" size={20} color={Colors.secundario} />
+          <Text style={styles.gridLabel}>Compromiso</Text>
+          <Text style={styles.gridValor}>{formatearMoneda(compromisoMensual)}</Text>
         </View>
-        <View style={{ width: 12 }} />
-        <View style={[styles.miniCard, { flex: 1 }]}>
-          <Ionicons name="business-outline" size={24} color={Colors.primario} />
-          <Text style={styles.miniLabel}>Cuentas</Text>
-          <Text style={styles.miniValor}>{cuentas.length}</Text>
+        {/* Cuentas */}
+        <View style={[styles.gridItem, { flex: 1 }]}>
+          <Ionicons name="business-outline" size={20} color={Colors.primario} />
+          <Text style={styles.gridLabel}>Cuentas</Text>
+          <Text style={styles.gridValor}>{cuentas.length}</Text>
         </View>
       </View>
 
-      <View style={{ height: 24 }} />
+      <View style={{ height: 12 }} />
 
       {/* ====== COMPROMISOS DEL MES ====== */}
       {progreso && (
@@ -410,22 +406,24 @@ const styles = StyleSheet.create({
   logoutBtn: { padding: 8 },
   card: {
     backgroundColor: '#fff', borderRadius: BorderRadius.lg, marginHorizontal: Spacing.lg,
-    marginTop: Spacing.md, padding: Spacing.lg,
+    marginTop: Spacing.sm, padding: Spacing.md,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
   },
-  cardTitulo: { fontSize: FontSize.lg, fontWeight: '700', color: Colors.texto, marginBottom: 12 },
+  cardTitulo: { fontSize: FontSize.md, fontWeight: '700', color: Colors.texto, marginBottom: 8 },
   saludContainer: { alignItems: 'center', justifyContent: 'center', position: 'relative' },
   saludTexto: { position: 'absolute', alignItems: 'center' },
-  saludPuntaje: { fontSize: 36, fontWeight: '800' },
-  saludNivel: { fontSize: FontSize.sm, color: Colors.textoSecundario, fontWeight: '600' },
-  row: { flexDirection: 'row', marginHorizontal: Spacing.lg, marginTop: Spacing.md },
-  miniCard: {
-    backgroundColor: '#fff', borderRadius: BorderRadius.md, padding: Spacing.md,
-    alignItems: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
+  saludPuntaje: { fontSize: 22, fontWeight: '800' },
+  saludNivel: { fontSize: 9, color: Colors.textoSecundario, fontWeight: '600' },
+  resumenGrid: {
+    flexDirection: 'row', marginHorizontal: Spacing.lg, marginTop: Spacing.sm, gap: 8,
   },
-  miniLabel: { fontSize: FontSize.xs, color: Colors.textoSecundario, marginTop: 6, textAlign: 'center' },
-  miniValor: { fontSize: FontSize.md, fontWeight: '700', color: Colors.texto, marginTop: 4, textAlign: 'center' },
+  gridItem: {
+    backgroundColor: '#fff', borderRadius: BorderRadius.md, paddingVertical: 10, paddingHorizontal: 8,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
+  },
+  gridLabel: { fontSize: 10, color: Colors.textoSecundario, marginTop: 4, textAlign: 'center' },
+  gridValor: { fontSize: FontSize.sm, fontWeight: '700', color: Colors.texto, marginTop: 2, textAlign: 'center' },
   creditoRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: Colors.borde,

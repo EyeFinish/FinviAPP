@@ -4,6 +4,7 @@ import BarraNavegacion from './componentes/BarraNavegacion';
 import BarraLateral from './componentes/BarraLateral';
 import Dashboard from './componentes/Dashboard';
 import ConectarBanco from './componentes/ConectarBanco';
+import Configuracion from './componentes/Configuracion';
 import Login from './componentes/Login';
 import Registro from './componentes/Registro';
 import './estilos/global.css';
@@ -46,6 +47,7 @@ function AppContent() {
             <Route path="/cuentas" element={<RutaProtegida><Dashboard seccion="cuentas" /></RutaProtegida>} />
             <Route path="/conexiones" element={<RutaProtegida><Dashboard seccion="conexiones" /></RutaProtegida>} />
             <Route path="/conectar" element={<RutaProtegida><ConectarBanco /></RutaProtegida>} />
+            <Route path="/configuracion" element={<RutaProtegida><Configuracion /></RutaProtegida>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>

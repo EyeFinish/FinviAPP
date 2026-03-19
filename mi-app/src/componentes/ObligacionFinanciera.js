@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   obtenerResumenObligaciones, obtenerIngresos, crearIngreso, actualizarIngreso, eliminarIngreso,
   obtenerCostosFijos, crearCostoFijo, actualizarCostoFijo, eliminarCostoFijo,
@@ -7,8 +7,8 @@ import {
 import { formatearMoneda } from '../utilidades/formateadores';
 import {
   DollarSign, TrendingDown, CreditCard, PieChart, Plus,
-  Trash2, Edit3, X, Check, AlertTriangle, ChevronDown, ChevronUp,
-  Calendar, BarChart3, Table,
+  Trash2, Edit3, X, Check, AlertTriangle, ChevronDown,
+  BarChart3, Table, Leaf, CircleCheck, Circle,
 } from 'lucide-react';
 import '../estilos/obligaciones.css';
 
@@ -206,10 +206,11 @@ export default function ObligacionFinanciera() {
   const [costos, setCostos] = useState([]);
   const [deudas, setDeudas] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState('resumen');
+  const [tab, setTab] = useState('proyeccion');
   const [modal, setModal] = useState(null);
-  const [proyeccionAbierta, setProyeccionAbierta] = useState(null);
   const [tablaAmort, setTablaAmort] = useState(null); // { deudaId, tabla }
+  const [escenario, setEscenario] = useState('conDeuda'); // 'conDeuda' | 'sinDeuda'
+  const [mesExpandido, setMesExpandido] = useState(null);
 
   const cargar = useCallback(async () => {
     try {
@@ -296,11 +297,11 @@ export default function ObligacionFinanciera() {
 
       <div className="ob-tabs">
         {[
+          { id: 'proyeccion', label: 'Proyección', icon: <BarChart3 size={16} /> },
           { id: 'resumen', label: 'Resumen', icon: <PieChart size={16} /> },
           { id: 'ingresos', label: 'Ingresos', icon: <DollarSign size={16} /> },
           { id: 'costos', label: 'Costos fijos', icon: <TrendingDown size={16} /> },
           { id: 'deudas', label: 'Deudas', icon: <CreditCard size={16} /> },
-          { id: 'proyeccion', label: 'Proyección', icon: <BarChart3 size={16} /> },
         ].map((t) => (
           <button key={t.id} className={`ob-tab ${tab === t.id ? 'activo' : ''}`} onClick={() => setTab(t.id)}>
             {t.icon} {t.label}
@@ -456,6 +457,12 @@ export default function ObligacionFinanciera() {
                 <span>Total mensual</span>
                 <span className="gasto">{formatearMoneda(costos.reduce((s, c) => s + c.monto, 0))}</span>
               </div>
+              {resumen?.totalAcumuladoCostos > 0 && (
+                <div className="ob-lista-acumulado">
+                  <span>Total gastado acumulado</span>
+                  <span>{formatearMoneda(resumen.totalAcumuladoCostos)}</span>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -532,10 +539,18 @@ export default function ObligacionFinanciera() {
             </div>
           )}
           {deudas.length > 0 && (
-            <div className="ob-lista-total" style={{ marginTop: 16 }}>
-              <span>Total cuotas mensuales</span>
-              <span className="gasto">{formatearMoneda(deudas.reduce((s, d) => s + d.cuotaMensual, 0))}</span>
-            </div>
+            <>
+              <div className="ob-lista-total" style={{ marginTop: 16 }}>
+                <span>Total cuotas mensuales</span>
+                <span className="gasto">{formatearMoneda(deudas.reduce((s, d) => s + d.cuotaMensual, 0))}</span>
+              </div>
+              {resumen?.totalAcumuladoDeudas > 0 && (
+                <div className="ob-lista-acumulado" style={{ marginTop: 0 }}>
+                  <span>Total pagado acumulado</span>
+                  <span>{formatearMoneda(resumen.totalAcumuladoDeudas)}</span>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
@@ -543,39 +558,206 @@ export default function ObligacionFinanciera() {
       {/* ===== TAB: PROYECCIÓN ===== */}
       {tab === 'proyeccion' && resumen?.proyeccion && (
         <div className="ob-contenido">
-          <h2 className="ob-proy-titulo">Proyección 12 meses</h2>
-          <div className="ob-proy-grid">
-            {resumen.proyeccion.map((m, i) => {
-              const abierto = proyeccionAbierta === i;
-              return (
-                <div key={m.mes} className="ob-proy-card">
-                  <div className="ob-proy-card-header" onClick={() => setProyeccionAbierta(abierto ? null : i)}>
-                    <span className="ob-proy-mes">{m.mesLabel}</span>
-                    <span className={`ob-proy-flujo ${m.flujo >= 0 ? 'positivo' : 'negativo'}`}>{formatearMoneda(m.flujo)}</span>
-                    {abierto ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                  </div>
-                  {abierto && (
-                    <div className="ob-proy-detalle">
-                      <div className="ob-proy-fila ingreso"><span>Ingresos</span><span>{formatearMoneda(m.ingresos)}</span></div>
-                      <div className="ob-proy-fila gasto"><span>Costos fijos</span><span>-{formatearMoneda(m.costos)}</span></div>
-                      <div className="ob-proy-fila gasto"><span>Deudas</span><span>-{formatearMoneda(m.deudas)}</span></div>
-                      {m.items && m.items.length > 0 && (
-                        <>
-                          <div className="ob-proy-separador" />
-                          <div className="ob-proy-venc-titulo"><Calendar size={14} /> Detalle</div>
-                          {m.items.map((v, j) => (
-                            <div key={j} className={`ob-proy-venc ${v.tipo}`}>
-                              <span>{v.nombre}{v.detalle ? ` (${v.detalle})` : ''}</span>
-                              <span>{v.tipo === 'ingreso' ? '+' : '-'}{formatearMoneda(v.monto)}</span>
+          <div className="ob-proy-header">
+            <h2 className="ob-proy-titulo">Flujo de caja — 12 meses</h2>
+            <div className="ob-escenario-toggle">
+              <button className={`ob-escenario-btn ${escenario === 'conDeuda' ? 'activo' : ''}`} onClick={() => setEscenario('conDeuda')}>Pagando deudas</button>
+              <button className={`ob-escenario-btn ${escenario === 'sinDeuda' ? 'activo' : ''}`} onClick={() => setEscenario('sinDeuda')}>Sin pagar deudas</button>
+            </div>
+          </div>
+
+          {resumen.saldoInicial != null && (
+            <div className="ob-flujo-saldo-inicial">
+              Saldo inicial (cuentas bancarias): <strong>{formatearMoneda(resumen.saldoInicial)}</strong>
+            </div>
+          )}
+
+          <div className="ob-flujo-tabla-wrapper">
+            <table className="ob-flujo-tabla">
+              <thead>
+                <tr>
+                  <th className="ob-flujo-th-mes">Mes</th>
+                  <th>Ingresos</th>
+                  <th>Costos fijos</th>
+                  <th>G. Variables</th>
+                  {escenario === 'conDeuda' && <th>Deudas</th>}
+                  <th>Flujo</th>
+                  <th>Acumulado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {resumen.proyeccion.map((m) => {
+                  const flujo = escenario === 'conDeuda' ? m.flujoConDeuda : m.flujoSinDeuda;
+                  const acumulado = escenario === 'conDeuda' ? m.saldoAcumuladoConDeuda : m.saldoAcumuladoSinDeuda;
+                  const abierto = mesExpandido === m.mes;
+                  const colSpan = escenario === 'conDeuda' ? 7 : 6;
+                  const itemsCostos = m.items?.filter((it) => it.tipo === 'costo') || [];
+                  const itemsDeudas = m.items?.filter((it) => it.tipo === 'deuda') || [];
+                  const itemsArrastre = m.items?.filter((it) => it.tipo === 'arrastre') || [];
+                  const deudasPagadas = itemsDeudas.filter((it) => it.pagado).length;
+                  const deudasTotal = itemsDeudas.length;
+                  const todasPagadas = deudasTotal > 0 && deudasPagadas === deudasTotal;
+                  return (
+                    <React.Fragment key={m.mes}>
+                      <tr
+                        className={`ob-flujo-fila-click ${m.esActual ? 'ob-flujo-actual' : ''}`}
+                        onClick={() => setMesExpandido(abierto ? null : m.mes)}
+                      >
+                        <td className="ob-flujo-td-mes">
+                          {m.mesLabel}
+                          {m.esActual && <span className="ob-flujo-badge-hoy">hoy</span>}
+                          <ChevronDown size={14} className={`ob-flujo-chevron ${abierto ? 'abierto' : ''}`} />
+                        </td>
+                        <td className="ob-flujo-ingreso">
+                          {formatearMoneda(m.ingresos)}
+                          {m.esActual && <span className="ob-flujo-nota">real</span>}
+                        </td>
+                        <td className="ob-flujo-gasto">
+                          {formatearMoneda(m.costosFijos)}
+                          {m.ahorroCostos > 0 && (
+                            <span className="ob-flujo-ahorro"><Leaf size={10} /> {formatearMoneda(m.ahorroCostos)}</span>
+                          )}
+                        </td>
+                        <td className="ob-flujo-variable">
+                          {m.gastosVariables > 0 ? formatearMoneda(m.gastosVariables) : '—'}
+                          {m.esActual && m.gastosVariables > 0 && (
+                            <span className="ob-flujo-variable-nota">real</span>
+                          )}
+                        </td>
+                        {escenario === 'conDeuda' && (
+                          <td className={`ob-flujo-deuda ${todasPagadas ? 'pagadas' : deudasTotal > 0 && deudasPagadas === 0 ? 'pendientes' : ''}`}>
+                            {m.deudas > 0 ? (
+                              <span className="ob-flujo-deuda-monto">
+                                {formatearMoneda(m.deudas)}
+                                {deudasTotal > 0 && (
+                                  <span className={`ob-flujo-deuda-estado ${todasPagadas ? 'ok' : 'pend'}`}>
+                                    {todasPagadas ? <CircleCheck size={11} /> : `${deudasPagadas}/${deudasTotal}`}
+                                  </span>
+                                )}
+                              </span>
+                            ) : '—'}
+                            {m.arrastre > 0 && (
+                              <span className="ob-flujo-mora-badge">
+                                <AlertTriangle size={10} /> +{formatearMoneda(m.arrastre + m.interesMoratorio)}
+                              </span>
+                            )}
+                          </td>
+                        )}
+                        <td className={`ob-flujo-flujo ${flujo >= 0 ? 'positivo' : 'negativo'}`}>
+                          {flujo >= 0 ? '+' : ''}{formatearMoneda(flujo)}
+                        </td>
+                        <td className={`ob-flujo-acum ${acumulado >= 0 ? 'positivo' : 'negativo'}`}>
+                          {acumulado >= 0 ? '+' : ''}{formatearMoneda(acumulado)}
+                        </td>
+                      </tr>
+                      {abierto && (
+                        <tr key={`${m.mes}-detail`} className="ob-flujo-detalle-row">
+                          <td colSpan={colSpan} className="ob-flujo-detalle-cell">
+                            {/* Barra global del mes */}
+                            <div className="ob-flujo-barra-global">
+                              <div className="ob-flujo-barra-info">
+                                <span>Progreso del mes</span>
+                                <span>{formatearMoneda(m.totalPagadoMes)} / {formatearMoneda(m.totalEsperado)} ({m.porcentajeGlobal}%)</span>
+                              </div>
+                              <div className="ob-flujo-barra-fondo">
+                                <div className="ob-flujo-barra-fill" style={{ width: `${m.porcentajeGlobal}%` }} />
+                              </div>
                             </div>
-                          ))}
-                        </>
+
+                            {/* Costos fijos */}
+                            {itemsCostos.length > 0 && (
+                              <div className="ob-flujo-grupo">
+                                <div className="ob-flujo-grupo-titulo">Costos fijos</div>
+                                {itemsCostos.map((it, idx) => (
+                                  <div key={idx} className={`ob-flujo-item ${it.pagado ? 'pagado' : ''}`}>
+                                    <div className="ob-flujo-item-icon">
+                                      {it.pagado ? <CircleCheck size={16} className="ob-icon-pagado" /> : <Circle size={16} className="ob-icon-pendiente" />}
+                                    </div>
+                                    <div className="ob-flujo-item-info">
+                                      <span className="ob-flujo-item-nombre">{it.nombre}</span>
+                                      <div className="ob-flujo-item-barra-fondo">
+                                        <div className={`ob-flujo-item-barra ${it.pagado ? 'completa' : ''}`} style={{ width: `${it.porcentaje}%` }} />
+                                      </div>
+                                    </div>
+                                    <div className="ob-flujo-item-montos">
+                                      <span className={it.pagado ? 'ob-monto-pagado' : 'ob-monto-pendiente'}>{formatearMoneda(it.montoPagado)}</span>
+                                      <span className="ob-monto-esperado">/ {formatearMoneda(it.montoEsperado)}</span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Deudas */}
+                            {itemsDeudas.length > 0 && (
+                              <div className="ob-flujo-grupo">
+                                <div className="ob-flujo-grupo-titulo">Deudas</div>
+                                {itemsDeudas.map((it, idx) => (
+                                  <div key={idx} className={`ob-flujo-item ${it.pagado ? 'pagado' : ''}`}>
+                                    <div className="ob-flujo-item-icon">
+                                      {it.pagado ? <CircleCheck size={16} className="ob-icon-pagado" /> : <Circle size={16} className="ob-icon-pendiente" />}
+                                    </div>
+                                    <div className="ob-flujo-item-info">
+                                      <div className="ob-flujo-item-nombre-row">
+                                        <span className="ob-flujo-item-nombre">{it.nombre}</span>
+                                        {it.detalle && <span className="ob-flujo-item-cuota">{it.detalle}</span>}
+                                      </div>
+                                      <div className="ob-flujo-item-barra-fondo">
+                                        <div className={`ob-flujo-item-barra deuda ${it.pagado ? 'completa' : ''}`} style={{ width: `${it.porcentaje}%` }} />
+                                      </div>
+                                    </div>
+                                    <div className="ob-flujo-item-montos">
+                                      <span className={it.pagado ? 'ob-monto-pagado' : 'ob-monto-pendiente'}>{formatearMoneda(it.montoPagado)}</span>
+                                      <span className="ob-monto-esperado">/ {formatearMoneda(it.montoEsperado)}</span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Arrastre de deudas impagas */}
+                            {itemsArrastre.length > 0 && (
+                              <div className="ob-flujo-grupo ob-flujo-grupo-arrastre">
+                                <div className="ob-flujo-grupo-titulo"><AlertTriangle size={14} /> Deuda arrastrada</div>
+                                {itemsArrastre.map((it, idx) => (
+                                  <div key={idx} className="ob-flujo-item ob-flujo-arrastre">
+                                    <div className="ob-flujo-item-icon">
+                                      <AlertTriangle size={16} className="ob-icon-arrastre" />
+                                    </div>
+                                    <div className="ob-flujo-item-info">
+                                      <span className="ob-flujo-item-nombre">{it.nombre}</span>
+                                      {it.detalle && <span className="ob-flujo-item-cuota">{it.detalle}</span>}
+                                    </div>
+                                    <div className="ob-flujo-item-montos">
+                                      <span className="ob-monto-pendiente">{formatearMoneda(it.montoEsperado)}</span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {(!m.items || m.items.length === 0) && (
+                              <div className="ob-flujo-sin-items">Sin obligaciones este mes</div>
+                            )}
+                          </td>
+                        </tr>
                       )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="ob-flujo-leyenda">
+            <span><span className="ob-leyenda-dot actual"></span> Mes actual — ingresos reales de transacciones</span>
+            <span><CircleCheck size={12} className="ob-icon-pagado" /> Pagado</span>
+            <span><Circle size={12} className="ob-icon-pendiente" /> Pendiente</span>
+            {resumen.proyeccion[0]?.ahorroCostos > 0 && (
+              <span><Leaf size={12} className="ob-leyenda-ahorro" /> Ahorro en gastos fijos</span>
+            )}
+            <span><AlertTriangle size={12} className="ob-icon-arrastre" /> Deuda arrastrada / mora</span>
+            <span className="ob-leyenda-variable">G. Variables: solo mes actual (real)</span>
           </div>
         </div>
       )}

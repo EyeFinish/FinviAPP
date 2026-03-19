@@ -250,4 +250,30 @@ export const obtenerEstadoFinanciero = async (mes) => {
   return response.data;
 };
 
+export const obtenerCategoriasDisponibles = async () => {
+  const response = await api.get('/estado/categorias');
+  return response.data;
+};
+
+export const categorizarMovimiento = async (descripcion, categoria) => {
+  const response = await api.post('/estado/categorizar', { descripcion, categoria });
+  return response.data;
+};
+
+// ===== CONFIGURACIÓN / PERFIL =====
+export const actualizarPerfil = async (datos) => {
+  const response = await api.put('/auth/perfil', datos);
+  return response.data;
+};
+
+export const cambiarPassword = async (datos) => {
+  const response = await api.put('/auth/password', datos);
+  return response.data;
+};
+
+export const eliminarCuenta = async (password) => {
+  const response = await api.delete('/auth/cuenta', { data: { password } });
+  return response.data;
+};
+
 export default api;

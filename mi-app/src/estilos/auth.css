@@ -218,6 +218,23 @@
   color: #b8c4ff;
 }
 
+.navbar-btn-config {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: #b8c4ff;
+  padding: 7px;
+  border-radius: var(--radio-sm);
+  cursor: pointer;
+  transition: var(--transicion);
+  margin-left: 8px;
+  display: flex;
+  align-items: center;
+}
+.navbar-btn-config:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: var(--color-blanco);
+}
+
 .navbar-btn-salir {
   background: rgba(255, 255, 255, 0.1);
   border: none;

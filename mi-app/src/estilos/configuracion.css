@@ -1,0 +1,261 @@
+/* ===== CONFIGURACIÓN ===== */
+.config-container {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 32px 24px;
+}
+
+.config-titulo {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--color-texto);
+  margin-bottom: 28px;
+}
+
+/* --- Cards --- */
+.config-card {
+  background: var(--color-blanco);
+  border-radius: var(--radio-lg);
+  padding: 28px;
+  margin-bottom: 20px;
+  box-shadow: var(--sombra-sm);
+}
+
+.config-card-titulo {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-texto);
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.config-card-titulo svg {
+  color: var(--color-primario);
+}
+
+/* --- Form fields --- */
+.config-campo {
+  margin-bottom: 18px;
+}
+
+.config-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: #6b7280;
+  margin-bottom: 6px;
+}
+
+.config-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: var(--radio-sm);
+  font-size: 14px;
+  color: var(--color-texto);
+  background: #fafafa;
+  transition: var(--transicion);
+  box-sizing: border-box;
+}
+
+.config-input:focus {
+  outline: none;
+  border-color: var(--color-primario);
+  background: var(--color-blanco);
+  box-shadow: 0 0 0 3px rgba(24, 0, 173, 0.08);
+}
+
+.config-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.config-info-fecha {
+  font-size: 12px;
+  color: #9ca3af;
+  margin-top: 4px;
+}
+
+/* --- Buttons --- */
+.config-btn {
+  padding: 10px 24px;
+  border: none;
+  border-radius: var(--radio-sm);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transicion);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.config-btn-primario {
+  background: var(--color-primario);
+  color: var(--color-blanco);
+}
+.config-btn-primario:hover {
+  background: var(--color-primario-oscuro);
+}
+.config-btn-primario:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.config-btn-peligro {
+  background: var(--color-error);
+  color: var(--color-blanco);
+}
+.config-btn-peligro:hover {
+  background: #dc2626;
+}
+
+/* --- Messages --- */
+.config-msg {
+  padding: 10px 14px;
+  border-radius: var(--radio-sm);
+  font-size: 13px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.config-msg-exito {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+.config-msg-error {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+/* --- Zona peligro --- */
+.config-peligro {
+  border: 1.5px solid #fecaca;
+  background: #fffbfb;
+}
+
+.config-peligro .config-card-titulo {
+  color: var(--color-error);
+}
+.config-peligro .config-card-titulo svg {
+  color: var(--color-error);
+}
+
+.config-peligro-desc {
+  font-size: 13px;
+  color: #6b7280;
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+/* --- Modal eliminar --- */
+.config-modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.config-modal {
+  background: var(--color-blanco);
+  border-radius: var(--radio-lg);
+  padding: 28px;
+  max-width: 420px;
+  width: 90%;
+  box-shadow: var(--sombra-lg);
+}
+
+.config-modal-titulo {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-error);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.config-modal-desc {
+  font-size: 13px;
+  color: #6b7280;
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+.config-modal-acciones {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.config-btn-cancelar {
+  background: #f3f4f6;
+  color: #374151;
+}
+.config-btn-cancelar:hover {
+  background: #e5e7eb;
+}
+
+/* --- Ayuda / FAQ --- */
+.config-faq-item {
+  border-bottom: 1px solid #f3f4f6;
+}
+.config-faq-item:last-child {
+  border-bottom: none;
+}
+
+.config-faq-pregunta {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 0;
+  background: none;
+  border: none;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-texto);
+  cursor: pointer;
+  text-align: left;
+}
+.config-faq-pregunta:hover {
+  color: var(--color-primario);
+}
+
+.config-faq-chevron {
+  transition: transform 0.2s;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+.config-faq-chevron.abierto {
+  transform: rotate(180deg);
+}
+
+.config-faq-respuesta {
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.6;
+  padding: 0 0 14px;
+}
+
+/* --- Responsive --- */
+@media (max-width: 640px) {
+  .config-container {
+    padding: 20px 16px;
+  }
+  .config-card {
+    padding: 20px;
+  }
+  .config-modal {
+    padding: 20px;
+  }
+}

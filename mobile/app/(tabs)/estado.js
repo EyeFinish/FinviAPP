@@ -1,11 +1,11 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, RefreshControl,
-  TouchableOpacity, ActivityIndicator,
+  TouchableOpacity, ActivityIndicator, Modal,
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { obtenerEstadoFinanciero, resincronizarDatos } from '../../services/api';
+import { obtenerEstadoFinanciero, resincronizarDatos, obtenerCategoriasDisponibles, categorizarMovimiento } from '../../services/api';
 import { formatearMoneda, formatearFecha } from '../../utils/formateadores';
 import { Colors, Spacing, FontSize, BorderRadius } from '../../constants/theme';
 
@@ -20,6 +20,8 @@ export default function Estado() {
   const [vista, setVista] = useState('categoria');
   const [resyncLoading, setResyncLoading] = useState(false);
   const [expandido, setExpandido] = useState(null);
+  const [moverItem, setMoverItem] = useState(null);
+  const [catDisponibles, setCatDisponibles] = useState([]);
 
   const hacerResync = async () => {
     try {
@@ -46,6 +48,23 @@ export default function Estado() {
   };
 
   useFocusEffect(useCallback(() => { cargarDatos(); }, [mes]));
+
+  const abrirMover = async (descripcion) => {
+    try {
+      const res = await obtenerCategoriasDisponibles();
+      setCatDisponibles((res.data || res).filter(c => c.nombre !== 'Otros'));
+      setMoverItem({ descripcion });
+    } catch { /* silencioso */ }
+  };
+
+  const confirmarMover = async (categoria) => {
+    if (!moverItem) return;
+    try {
+      await categorizarMovimiento(moverItem.descripcion, categoria);
+      setMoverItem(null);
+      await cargarDatos();
+    } catch { /* silencioso */ }
+  };
 
   const cambiarMes = (delta) => {
     const [a, m] = mes.split('-').map(Number);
@@ -75,7 +94,7 @@ export default function Estado() {
     );
   }
 
-  const { resumen, categorias, porTipo, topGastos, topIngresos } = estado;
+  const { resumen, categorias, porTipo, topGastos, topIngresos, transferenciasInternas, suscripciones } = estado;
   const ingresosCateg = categorias.filter((c) => c.tipo === 'ingreso');
   const gastosCateg = categorias.filter((c) => c.tipo === 'gasto');
 
@@ -90,7 +109,12 @@ export default function Estado() {
           activeOpacity={0.7}
         >
           <View style={styles.catItemTop}>
-            <Text style={styles.catNombre} numberOfLines={1}>{item.nombre}</Text>
+            <View style={styles.catNombreRow}>
+              <View style={[styles.catIcono, { backgroundColor: (item.color || colorBarra) + '18' }]}>
+                <Ionicons name={item.icono || 'ellipsis-horizontal'} size={16} color={item.color || colorBarra} />
+              </View>
+              <Text style={styles.catNombre} numberOfLines={1}>{item.nombre}</Text>
+            </View>
             <View style={styles.catMontoRow}>
               <Text style={[styles.catMonto, { color: colorBarra }]}>{formatearMoneda(item.monto)}</Text>
               <Ionicons name={abierto ? 'chevron-up' : 'chevron-down'} size={14} color="#9ca3af" />
@@ -110,11 +134,18 @@ export default function Estado() {
               <View key={j} style={styles.detalleItem}>
                 <View style={styles.detalleInfo}>
                   <Text style={styles.detalleDesc} numberOfLines={1}>{m.descripcion}</Text>
-                  <Text style={styles.detalleMeta}>{formatearFecha(m.fecha)} · {m.cuenta}</Text>
+                  <Text style={styles.detalleMeta}>{m.cantidad} {m.cantidad === 1 ? 'movimiento' : 'movimientos'}</Text>
                 </View>
-                <Text style={[styles.detalleMonto, { color: colorBarra }]}>
-                  {m.monto >= 0 ? '+' : ''}{formatearMoneda(m.monto)}
-                </Text>
+                <View style={styles.detalleAcciones}>
+                  {item.nombre === 'Otros' && (
+                    <TouchableOpacity style={styles.moverBtn} onPress={() => abrirMover(m.descripcion)}>
+                      <Ionicons name="add-circle-outline" size={16} color={Colors.primario} />
+                    </TouchableOpacity>
+                  )}
+                  <Text style={[styles.detalleMonto, { color: colorBarra }]}>
+                    {formatearMoneda(m.monto)}
+                  </Text>
+                </View>
               </View>
             ))}
           </View>
@@ -201,6 +232,16 @@ export default function Estado() {
             </View>
           </View>
 
+          {/* Banner transferencias internas */}
+          {transferenciasInternas && transferenciasInternas.cantidad > 0 && (
+            <View style={styles.transferBanner}>
+              <Ionicons name="swap-horizontal" size={18} color="#0369a1" />
+              <Text style={styles.transferText}>
+                Se excluyeron <Text style={{ fontWeight: '700' }}>{transferenciasInternas.cantidad}</Text> transferencias entre tus cuentas por <Text style={{ fontWeight: '700' }}>{formatearMoneda(transferenciasInternas.monto)}</Text>
+              </Text>
+            </View>
+          )}
+
           {/* Toggle vista */}
           <View style={styles.vistaToggle}>
             <TouchableOpacity
@@ -266,6 +307,30 @@ export default function Estado() {
           )}
 
           {/* Top movimientos */}
+          {/* Suscripciones detectadas */}
+          {suscripciones && suscripciones.length > 0 && (
+            <View style={styles.topCard}>
+              <View style={styles.suscripcionesHeader}>
+                <Ionicons name="refresh-circle" size={18} color="#8b5cf6" />
+                <Text style={styles.topTitulo}>Suscripciones detectadas</Text>
+                <View style={styles.suscripcionesBadge}>
+                  <Text style={styles.suscripcionesBadgeText}>{suscripciones.length}</Text>
+                </View>
+              </View>
+              {suscripciones.map((s, i) => (
+                <View key={i} style={styles.suscripcionItem}>
+                  <View style={[styles.suscripcionIcono, { backgroundColor: (s.color || '#9ca3af') + '18' }]}>
+                    <Ionicons name={s.icono || 'ellipsis-horizontal'} size={18} color={s.color || '#9ca3af'} />
+                  </View>
+                  <View style={styles.suscripcionInfo}>
+                    <Text style={styles.topDesc} numberOfLines={1}>{s.descripcion}</Text>
+                  </View>
+                  <Text style={[styles.topMonto, { color: Colors.error }]}>{formatearMoneda(s.monto)}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
           {topIngresos.length > 0 && (
             <View style={styles.topCard}>
               <Text style={styles.topTitulo}>
@@ -303,6 +368,36 @@ export default function Estado() {
       )}
 
       <View style={{ height: 100 }} />
+
+      {/* Modal seleccionar categoría */}
+      <Modal visible={!!moverItem} transparent animationType="slide" onRequestClose={() => setMoverItem(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitulo}>Mover a categoría</Text>
+              <TouchableOpacity onPress={() => setMoverItem(null)}>
+                <Ionicons name="close" size={22} color={Colors.texto} />
+              </TouchableOpacity>
+            </View>
+            {moverItem && (
+              <Text style={styles.modalDesc}>
+                <Text style={{ fontWeight: '700' }}>{moverItem.descripcion}</Text> se moverá y siempre se reconocerá en la categoría elegida.
+              </Text>
+            )}
+            <ScrollView style={styles.modalLista}>
+              {catDisponibles.map((cat) => (
+                <TouchableOpacity key={cat.nombre} style={styles.modalCatBtn} onPress={() => confirmarMover(cat.nombre)}>
+                  <View style={[styles.modalCatIcono, { backgroundColor: cat.color + '18' }]}>
+                    <Ionicons name={cat.icono || 'ellipsis-horizontal'} size={20} color={cat.color} />
+                  </View>
+                  <Text style={styles.modalCatText}>{cat.nombre}</Text>
+                  <Ionicons name="chevron-forward" size={16} color="#9ca3af" />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -380,8 +475,10 @@ const styles = StyleSheet.create({
 
   // Cat item
   catItem: { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f5f5f5' },
-  catItemTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  catNombre: { fontSize: FontSize.sm, fontWeight: '600', color: Colors.texto, flex: 1, marginRight: 8 },
+  catItemTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6, alignItems: 'center' },
+  catNombreRow: { flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 },
+  catIcono: { width: 28, height: 28, borderRadius: 8, justifyContent: 'center', alignItems: 'center', marginRight: 8 },
+  catNombre: { fontSize: FontSize.sm, fontWeight: '600', color: Colors.texto, flex: 1 },
   catMonto: { fontSize: FontSize.sm, fontWeight: '700' },
   catMontoRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   barraContainer: { height: 6, backgroundColor: '#f3f4f6', borderRadius: 3, overflow: 'hidden' },
@@ -424,4 +521,48 @@ const styles = StyleSheet.create({
   topDesc: { fontSize: FontSize.sm, fontWeight: '600', color: Colors.texto },
   topFecha: { fontSize: FontSize.xs, color: Colors.textoSecundario, marginTop: 2 },
   topMonto: { fontSize: FontSize.sm, fontWeight: '700' },
+
+  // Transfer banner
+  transferBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    marginHorizontal: Spacing.lg, marginTop: Spacing.md,
+    paddingVertical: 10, paddingHorizontal: 14,
+    backgroundColor: '#f0f9ff', borderRadius: BorderRadius.md,
+    borderWidth: 1, borderColor: '#bae6fd',
+  },
+  transferText: { flex: 1, fontSize: FontSize.xs, color: '#0369a1' },
+
+  // Suscripciones
+  suscripcionesHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: Colors.borde },
+  suscripcionesBadge: { backgroundColor: '#8b5cf6', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
+  suscripcionesBadgeText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  suscripcionItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f5f5f5' },
+  suscripcionIcono: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  suscripcionInfo: { flex: 1 },
+
+  // Move button & acciones
+  detalleAcciones: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  moverBtn: {
+    width: 30, height: 30, borderRadius: 8,
+    backgroundColor: Colors.primario + '12',
+    justifyContent: 'center', alignItems: 'center',
+  },
+
+  // Modal
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  modalContent: {
+    backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, paddingBottom: 40,
+    maxHeight: '70%',
+  },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  modalTitulo: { fontSize: FontSize.lg, fontWeight: '700', color: Colors.texto },
+  modalDesc: { fontSize: FontSize.sm, color: Colors.textoSecundario, marginBottom: 16 },
+  modalLista: { maxHeight: 400 },
+  modalCatBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#f5f5f5',
+  },
+  modalCatIcono: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  modalCatText: { flex: 1, fontSize: FontSize.md, fontWeight: '600', color: Colors.texto },
 });

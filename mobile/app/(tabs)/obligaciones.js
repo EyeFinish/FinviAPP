@@ -196,10 +196,11 @@ export default function Obligaciones() {
   const [deudas, setDeudas] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [refrescando, setRefrescando] = useState(false);
-  const [tab, setTab] = useState('resumen');
+  const [tab, setTab] = useState('proyeccion');
   const [modal, setModal] = useState(null);
   const [proyOpen, setProyOpen] = useState(null);
   const [tablaAmort, setTablaAmort] = useState(null);
+  const [escenario, setEscenario] = useState('conDeuda');
 
   const cargar = async () => {
     try {
@@ -239,11 +240,11 @@ export default function Obligaciones() {
   if (cargando) return <View style={st.center}><ActivityIndicator size="large" color={Colors.primario} /></View>;
 
   const TABS = [
+    { id: 'proyeccion', label: 'Proyección', icon: 'bar-chart' },
     { id: 'resumen', label: 'Resumen', icon: 'pie-chart' },
     { id: 'ingresos', label: 'Ingresos', icon: 'cash' },
     { id: 'costos', label: 'Costos', icon: 'trending-down' },
     { id: 'deudas', label: 'Deudas', icon: 'card' },
-    { id: 'proyeccion', label: 'Proyección', icon: 'bar-chart' },
   ];
 
   return (
@@ -369,6 +370,13 @@ export default function Obligaciones() {
                 </View>
               </View>
             )}
+            {resumen?.totalAcumuladoCostos > 0 && (
+              <View style={st.acumuladoCard}>
+                <Ionicons name="checkmark-done" size={16} color={Colors.exito} />
+                <Text style={st.acumuladoLabel}>Pagado acumulado (asignado)</Text>
+                <Text style={[st.acumuladoValor, { color: Colors.exito }]}>{formatearMoneda(resumen.totalAcumuladoCostos)}</Text>
+              </View>
+            )}
           </>
         )}
 
@@ -441,37 +449,198 @@ export default function Obligaciones() {
                 <Text style={[st.listaTotalValor, { color: Colors.error }]}>{formatearMoneda(deudas.reduce((s2, d) => s2 + d.cuotaMensual, 0))}</Text>
               </View>
             )}
+            {resumen?.totalAcumuladoDeudas > 0 && (
+              <View style={st.acumuladoCard}>
+                <Ionicons name="checkmark-done" size={16} color={Colors.exito} />
+                <Text style={st.acumuladoLabel}>Pagado acumulado (asignado)</Text>
+                <Text style={[st.acumuladoValor, { color: Colors.exito }]}>{formatearMoneda(resumen.totalAcumuladoDeudas)}</Text>
+              </View>
+            )}
           </>
         )}
 
         {/* ===== PROYECCIÓN ===== */}
         {tab === 'proyeccion' && resumen?.proyeccion && (
           <>
-            <Text style={st.proyTitulo}>Proyección 12 meses</Text>
+            <View style={st.proyHeader}>
+              <Text style={st.proyTitulo}>Flujo de caja — 12 meses</Text>
+              <View style={st.escenarioToggle}>
+                <TouchableOpacity
+                  style={[st.escenarioBtn, escenario === 'conDeuda' && st.escenarioBtnActivo]}
+                  onPress={() => setEscenario('conDeuda')}
+                >
+                  <Text style={[st.escenarioBtnText, escenario === 'conDeuda' && st.escenarioBtnTextActivo]}>Con deuda</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[st.escenarioBtn, escenario === 'sinDeuda' && st.escenarioBtnActivo]}
+                  onPress={() => setEscenario('sinDeuda')}
+                >
+                  <Text style={[st.escenarioBtnText, escenario === 'sinDeuda' && st.escenarioBtnTextActivo]}>Sin deuda</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {resumen.saldoInicial != null && (
+              <View style={st.saldoInicialBanner}>
+                <Text style={st.saldoInicialText}>Saldo inicial (cuentas): <Text style={st.saldoInicialValor}>{formatearMoneda(resumen.saldoInicial)}</Text></Text>
+              </View>
+            )}
+
             {resumen.proyeccion.map((m, i) => {
               const abierto = proyOpen === i;
+              const flujo = escenario === 'conDeuda' ? m.flujoConDeuda : m.flujoSinDeuda;
+              const acum = escenario === 'conDeuda' ? m.saldoAcumuladoConDeuda : m.saldoAcumuladoSinDeuda;
+              const itemsCostos = (m.items || []).filter((it) => it.tipo === 'costo');
+              const itemsDeudas = (m.items || []).filter((it) => it.tipo === 'deuda');
+              const itemsArrastre = (m.items || []).filter((it) => it.tipo === 'arrastre');
+
               return (
                 <View key={m.mes}>
-                  <TouchableOpacity style={st.proyCard} onPress={() => setProyOpen(abierto ? null : i)} activeOpacity={0.7}>
-                    <Text style={st.proyMes}>{m.mesLabel}</Text>
-                    <Text style={[st.proyFlujo, { color: m.flujo >= 0 ? Colors.exito : Colors.error }]}>{formatearMoneda(m.flujo)}</Text>
+                  <TouchableOpacity
+                    style={[st.proyCard, m.esActual && st.proyCardActual]}
+                    onPress={() => setProyOpen(abierto ? null : i)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={st.proyCardLeft}>
+                      <View style={st.proyMesRow}>
+                        <Text style={st.proyMes}>{m.mesLabel}</Text>
+                        {m.esActual && <View style={st.proyBadgeHoy}><Text style={st.proyBadgeHoyText}>Actual</Text></View>}
+                      </View>
+                      {/* Barra de progreso global */}
+                      <View style={st.proyBarraGlobal}>
+                        <View style={[st.proyBarraGlobalFill, { width: `${m.porcentajeGlobal || 0}%` }]} />
+                      </View>
+                      <Text style={st.proyBarraPct}>{m.porcentajeGlobal || 0}% pagado</Text>
+                    </View>
+                    <View style={st.proyCardRight}>
+                      <Text style={[st.proyFlujo, { color: flujo >= 0 ? Colors.exito : Colors.error }]}>
+                        {formatearMoneda(flujo)}
+                      </Text>
+                      <Text style={st.proyAcum}>Acum: {formatearMoneda(acum)}</Text>
+                    </View>
                     <Ionicons name={abierto ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.textoSecundario} />
                   </TouchableOpacity>
+
                   {abierto && (
                     <View style={st.proyDetalle}>
-                      <View style={st.proyFila}><Text style={st.proyFilaLabel}>Ingresos</Text><Text style={[st.proyFilaVal, { color: Colors.exito }]}>{formatearMoneda(m.ingresos)}</Text></View>
-                      <View style={st.proyFila}><Text style={st.proyFilaLabel}>Costos fijos</Text><Text style={[st.proyFilaVal, { color: Colors.error }]}>-{formatearMoneda(m.costos)}</Text></View>
-                      <View style={st.proyFila}><Text style={st.proyFilaLabel}>Deudas</Text><Text style={[st.proyFilaVal, { color: Colors.error }]}>-{formatearMoneda(m.deudas)}</Text></View>
-                      {m.items && m.items.length > 0 && (
+                      <View style={st.proyFila}>
+                        <Text style={st.proyFilaLabel}>Ingresos</Text>
+                        <Text style={[st.proyFilaVal, { color: Colors.exito }]}>{formatearMoneda(m.ingresos)}</Text>
+                      </View>
+                      <View style={st.proyFila}>
+                        <Text style={st.proyFilaLabel}>Costos fijos</Text>
+                        <Text style={[st.proyFilaVal, { color: Colors.error }]}>-{formatearMoneda(m.costosFijos)}</Text>
+                      </View>
+                      {m.ahorroCostos > 0 && (
+                        <View style={st.proyFila}>
+                          <View style={st.proyAhorroRow}>
+                            <Ionicons name="leaf" size={12} color={Colors.exito} />
+                            <Text style={[st.proyFilaLabel, { color: Colors.exito }]}>Ahorro costos</Text>
+                          </View>
+                          <Text style={[st.proyFilaVal, { color: Colors.exito }]}>{formatearMoneda(m.ahorroCostos)}</Text>
+                        </View>
+                      )}
+                      <View style={st.proyFila}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <Text style={[st.proyFilaLabel, { color: '#8b5cf6' }]}>G. Variables</Text>
+                          {m.esActual && m.gastosVariables > 0 && <Text style={st.proyVarNota}>real</Text>}
+                        </View>
+                        <Text style={[st.proyFilaVal, { color: '#8b5cf6' }]}>
+                          {m.gastosVariables > 0 ? `-${formatearMoneda(m.gastosVariables)}` : '—'}
+                        </Text>
+                      </View>
+                      {escenario === 'conDeuda' && (
+                        <View style={st.proyFila}>
+                          <Text style={st.proyFilaLabel}>Deudas</Text>
+                          <Text style={[st.proyFilaVal, { color: Colors.advertencia }]}>-{formatearMoneda(m.deudas)}</Text>
+                        </View>
+                      )}
+                      {escenario === 'conDeuda' && (m.arrastre > 0 || m.interesMoratorio > 0) && (
+                        <View style={st.proyFila}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <Ionicons name="warning" size={12} color={Colors.error} />
+                            <Text style={[st.proyFilaLabel, { color: Colors.error }]}>Arrastre + mora</Text>
+                          </View>
+                          <Text style={[st.proyFilaVal, { color: Colors.error }]}>-{formatearMoneda(m.arrastre + m.interesMoratorio)}</Text>
+                        </View>
+                      )}
+                      <View style={st.proySep} />
+                      <View style={st.proyFila}>
+                        <Text style={[st.proyFilaLabel, { fontWeight: '700' }]}>Flujo neto</Text>
+                        <Text style={[st.proyFilaVal, { color: flujo >= 0 ? Colors.exito : Colors.error, fontWeight: '800' }]}>
+                          {formatearMoneda(flujo)}
+                        </Text>
+                      </View>
+
+                      {/* Detalle items costos */}
+                      {itemsCostos.length > 0 && (
                         <>
                           <View style={st.proySep} />
-                          <Text style={st.proyVencTitulo}>Detalle</Text>
-                          {m.items.map((v, j) => (
-                            <View key={j} style={st.proyVenc}>
-                              <Text style={st.proyVencText}>{v.nombre}{v.detalle ? ` (${v.detalle})` : ''}</Text>
-                              <Text style={[st.proyVencMonto, { color: v.tipo === 'ingreso' ? Colors.exito : Colors.error }]}>
-                                {v.tipo === 'ingreso' ? '+' : '-'}{formatearMoneda(v.monto)}
-                              </Text>
+                          <Text style={st.proyGrupoTitulo}>Costos fijos</Text>
+                          {itemsCostos.map((it, j) => (
+                            <View key={`c-${j}`} style={st.proyItem}>
+                              <View style={st.proyItemHeader}>
+                                <Ionicons
+                                  name={it.pagado ? 'checkmark-circle' : 'ellipse-outline'}
+                                  size={16}
+                                  color={it.pagado ? Colors.exito : Colors.textoSecundario}
+                                />
+                                <Text style={[st.proyItemNombre, it.pagado && st.proyItemPagado]}>{it.nombre}</Text>
+                                <Text style={st.proyItemMontos}>
+                                  {formatearMoneda(it.montoPagado)}/{formatearMoneda(it.montoEsperado)}
+                                </Text>
+                              </View>
+                              <View style={st.proyItemBarra}>
+                                <View style={[st.proyItemBarraFill, { width: `${it.porcentaje}%`, backgroundColor: it.pagado ? Colors.exito : Colors.primario }]} />
+                              </View>
+                            </View>
+                          ))}
+                        </>
+                      )}
+
+                      {/* Detalle items deudas */}
+                      {escenario === 'conDeuda' && itemsDeudas.length > 0 && (
+                        <>
+                          <View style={st.proySep} />
+                          <Text style={st.proyGrupoTitulo}>Deudas</Text>
+                          {itemsDeudas.map((it, j) => (
+                            <View key={`d-${j}`} style={st.proyItem}>
+                              <View style={st.proyItemHeader}>
+                                <Ionicons
+                                  name={it.pagado ? 'checkmark-circle' : 'ellipse-outline'}
+                                  size={16}
+                                  color={it.pagado ? Colors.exito : Colors.textoSecundario}
+                                />
+                                <Text style={[st.proyItemNombre, it.pagado && st.proyItemPagado]}>{it.nombre}</Text>
+                                <Text style={st.proyItemMontos}>
+                                  {formatearMoneda(it.montoPagado)}/{formatearMoneda(it.montoEsperado)}
+                                </Text>
+                              </View>
+                              {it.detalle && <Text style={st.proyItemDetalle}>{it.detalle}</Text>}
+                              <View style={st.proyItemBarra}>
+                                <View style={[st.proyItemBarraFill, { width: `${it.porcentaje}%`, backgroundColor: it.pagado ? Colors.exito : Colors.advertencia }]} />
+                              </View>
+                            </View>
+                          ))}
+                        </>
+                      )}
+
+                      {/* Detalle items arrastre */}
+                      {escenario === 'conDeuda' && itemsArrastre.length > 0 && (
+                        <>
+                          <View style={st.proySep} />
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 6 }}>
+                            <Ionicons name="warning" size={14} color={Colors.error} />
+                            <Text style={[st.proyGrupoTitulo, { color: Colors.error, marginBottom: 0 }]}>Deuda arrastrada</Text>
+                          </View>
+                          {itemsArrastre.map((it, j) => (
+                            <View key={`a-${j}`} style={st.proyArrastreItem}>
+                              <View style={st.proyItemHeader}>
+                                <Ionicons name="warning" size={16} color={Colors.error} />
+                                <Text style={[st.proyItemNombre, { color: Colors.error }]}>{it.nombre}</Text>
+                                <Text style={[st.proyItemMontos, { color: Colors.error }]}>{formatearMoneda(it.montoEsperado)}</Text>
+                              </View>
+                              {it.detalle && <Text style={[st.proyItemDetalle, { color: Colors.error }]}>{it.detalle}</Text>}
                             </View>
                           ))}
                         </>
@@ -585,19 +754,55 @@ const st = StyleSheet.create({
   previewLabel: { fontSize: 11, color: '#6b7280' },
   previewValue: { fontSize: 14, fontWeight: '800', color: '#111827', marginTop: 2 },
 
-  proyTitulo: { fontSize: FontSize.lg, fontWeight: '700', color: Colors.texto, marginTop: Spacing.md, marginBottom: Spacing.sm },
-  proyCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fff', borderRadius: BorderRadius.md, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 2 },
-  proyMes: { fontSize: FontSize.md, fontWeight: '700', color: Colors.texto, textTransform: 'capitalize', flex: 1 },
-  proyFlujo: { fontSize: FontSize.md, fontWeight: '800', marginRight: 8 },
-  proyDetalle: { backgroundColor: '#fff', borderRadius: BorderRadius.md, padding: 16, marginBottom: 8, marginTop: -4 },
-  proyFila: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
+  proyHeader: { marginTop: Spacing.md, marginBottom: Spacing.sm },
+  proyTitulo: { fontSize: FontSize.lg, fontWeight: '700', color: Colors.texto, marginBottom: 8 },
+
+  escenarioToggle: { flexDirection: 'row', backgroundColor: '#f3f4f6', borderRadius: 20, padding: 3, alignSelf: 'flex-start' },
+  escenarioBtn: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 18 },
+  escenarioBtnActivo: { backgroundColor: Colors.primario },
+  escenarioBtnText: { fontSize: FontSize.xs, fontWeight: '600', color: Colors.textoSecundario },
+  escenarioBtnTextActivo: { color: '#fff' },
+
+  proyCard: { backgroundColor: '#fff', borderRadius: BorderRadius.md, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 8, flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 2 },
+  proyCardActual: { borderLeftWidth: 3, borderLeftColor: Colors.primario },
+  proyCardLeft: { flex: 1, marginRight: 10 },
+  proyMesRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
+  proyMes: { fontSize: FontSize.sm, fontWeight: '700', color: Colors.texto, textTransform: 'capitalize' },
+  proyBadgeHoy: { backgroundColor: Colors.primario + '20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
+  proyBadgeHoyText: { fontSize: 10, fontWeight: '700', color: Colors.primario },
+  proyBarraGlobal: { height: 4, backgroundColor: '#f3f4f6', borderRadius: 2, overflow: 'hidden', marginBottom: 2 },
+  proyBarraGlobalFill: { height: '100%', borderRadius: 2, backgroundColor: Colors.exito },
+  proyBarraPct: { fontSize: 10, color: Colors.textoSecundario },
+  proyCardRight: { alignItems: 'flex-end', marginRight: 6 },
+  proyFlujo: { fontSize: FontSize.md, fontWeight: '800' },
+  proyAcum: { fontSize: 10, color: Colors.textoSecundario, marginTop: 2 },
+
+  proyDetalle: { backgroundColor: '#fff', borderRadius: BorderRadius.md, padding: 14, marginBottom: 8, marginTop: -4, borderTopWidth: 1, borderTopColor: '#f3f4f6' },
+  proyFila: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 3 },
   proyFilaLabel: { fontSize: FontSize.sm, color: Colors.textoSecundario },
   proyFilaVal: { fontSize: FontSize.sm, fontWeight: '600' },
+  proyAhorroRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   proySep: { borderTopWidth: 1, borderTopColor: '#e5e7eb', marginVertical: 8 },
-  proyVencTitulo: { fontSize: FontSize.xs, fontWeight: '700', color: Colors.textoSecundario, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 },
-  proyVenc: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
-  proyVencText: { fontSize: FontSize.xs, color: Colors.textoSecundario },
-  proyVencMonto: { fontSize: FontSize.xs, fontWeight: '600' },
+
+  proyGrupoTitulo: { fontSize: FontSize.xs, fontWeight: '700', color: Colors.textoSecundario, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 },
+  proyItem: { marginBottom: 8 },
+  proyItemHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  proyItemNombre: { flex: 1, fontSize: FontSize.sm, color: Colors.texto, fontWeight: '500' },
+  proyItemPagado: { color: Colors.textoSecundario, textDecorationLine: 'line-through' },
+  proyItemMontos: { fontSize: FontSize.xs, color: Colors.textoSecundario, fontWeight: '600' },
+  proyItemDetalle: { fontSize: 10, color: Colors.textoSecundario, marginLeft: 22, marginTop: 1 },
+  proyItemBarra: { height: 4, backgroundColor: '#f3f4f6', borderRadius: 2, overflow: 'hidden', marginTop: 4, marginLeft: 22 },
+  proyItemBarraFill: { height: '100%', borderRadius: 2 },
+
+  saldoInicialBanner: { backgroundColor: '#f0f4ff', borderWidth: 1, borderColor: '#dbe4ff', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8, marginBottom: 10 },
+  saldoInicialText: { fontSize: FontSize.xs, color: Colors.primario },
+  saldoInicialValor: { fontWeight: '700' },
+  proyVarNota: { fontSize: 9, color: '#a78bfa', fontStyle: 'italic' },
+  proyArrastreItem: { backgroundColor: '#fef2f2', borderRadius: 8, padding: 8, marginBottom: 4 },
+
+  acumuladoCard: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.exito + '10', borderRadius: BorderRadius.md, paddingHorizontal: 14, paddingVertical: 10, marginTop: Spacing.sm },
+  acumuladoLabel: { flex: 1, fontSize: FontSize.xs, color: Colors.textoSecundario, fontWeight: '600' },
+  acumuladoValor: { fontSize: FontSize.md, fontWeight: '800' },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '90%' },

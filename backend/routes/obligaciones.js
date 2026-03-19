@@ -5,6 +5,7 @@ const Income = require('../models/Income');
 const FixedCost = require('../models/FixedCost');
 const Debt = require('../models/Debt');
 const Movement = require('../models/Movement');
+const Account = require('../models/Account');
 
 const SISTEMAS_LABEL = { frances: 'Francés', aleman: 'Alemán', simple: 'Simple' };
 
@@ -246,6 +247,8 @@ router.get('/resumen', async (req, res) => {
 
     const hoy = new Date();
     const mesActual = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+    const finMesActual = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 1);
+    const mesActualKey = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
 
     const totalIngresos = ingresos.reduce((s, i) => s + i.monto, 0);
 
@@ -274,38 +277,236 @@ router.get('/resumen', async (req, res) => {
       nivelCarga = 'Crítico'; riesgoSobreendeudamiento = 'Muy alto';
     }
 
-    // Proyección 12 meses con cálculo dinámico por mes
+    // ===== Ingresos reales del mes actual (desde transacciones) =====
+    const cuentas = await Account.find({ user: req.user._id }).select('_id balance').lean();
+    const accountIds = cuentas.map((c) => c._id);
+    const saldoInicial = cuentas.reduce((s, c) => s + (c.balance?.available ?? c.balance?.current ?? 0), 0);
+
+    const movimientosMesActual = await Movement.find({
+      user: req.user._id,
+      account: { $in: accountIds },
+      postDate: { $gte: mesActual, $lt: finMesActual },
+    }).select('amount').lean();
+
+    let ingresosRealesMes = 0;
+    let gastosRealesMes = 0;
+    movimientosMesActual.forEach((m) => {
+      if (m.amount >= 0) ingresosRealesMes += m.amount;
+      else gastosRealesMes += Math.abs(m.amount);
+    });
+
+    // ===== Totales acumulados desde transacciones asignadas =====
+    const movimientosAsignados = await Movement.find({
+      user: req.user._id,
+      'asignacion.tipo': { $ne: null },
+    }).select('amount asignacion').lean();
+
+    const acumuladoCostos = {};
+    const acumuladoDeudas = {};
+    for (const mov of movimientosAsignados) {
+      const monto = Math.abs(mov.amount);
+      const refId = mov.asignacion.referenciaId?.toString();
+      if (mov.asignacion.tipo === 'costoFijo' && refId) {
+        acumuladoCostos[refId] = (acumuladoCostos[refId] || 0) + monto;
+      } else if (mov.asignacion.tipo === 'deuda' && refId) {
+        acumuladoDeudas[refId] = (acumuladoDeudas[refId] || 0) + monto;
+      }
+    }
+
+    const totalAcumuladoCostos = Object.values(acumuladoCostos).reduce((s, v) => s + v, 0);
+    const totalAcumuladoDeudas = Object.values(acumuladoDeudas).reduce((s, v) => s + v, 0);
+
+    // ===== Gastos reales del mes en costos fijos (para calcular ahorro) =====
+    const movsCostosMesActual = await Movement.find({
+      user: req.user._id,
+      'asignacion.tipo': 'costoFijo',
+      'asignacion.mes': mesActualKey,
+    }).select('amount').lean();
+    const gastosRealesCostosFijos = movsCostosMesActual.reduce((s, m) => s + Math.abs(m.amount), 0);
+
+    // ===== Gastos reales asignados a deudas este mes =====
+    const movsDeudaMesActual = await Movement.find({
+      user: req.user._id,
+      'asignacion.tipo': 'deuda',
+      'asignacion.mes': mesActualKey,
+    }).select('amount').lean();
+    const gastosRealesDeudas = movsDeudaMesActual.reduce((s, m) => s + Math.abs(m.amount), 0);
+
+    // ===== Gastos variables = movimientos negativos del mes sin asignación =====
+    const movsVariablesMesActual = await Movement.find({
+      user: req.user._id,
+      account: { $in: accountIds },
+      amount: { $lt: 0 },
+      postDate: { $gte: mesActual, $lt: finMesActual },
+      $or: [
+        { 'asignacion.tipo': null },
+        { 'asignacion.tipo': { $exists: false } },
+      ],
+    }).select('amount').lean();
+    const gastosVariablesMesActual = movsVariablesMesActual.reduce((s, m) => s + Math.abs(m.amount), 0);
+
+    // ===== Proyección 12 meses con dos escenarios =====
     const proyeccion = [];
+    let saldoAcumuladoConDeuda = saldoInicial;
+    let saldoAcumuladoSinDeuda = saldoInicial;
+
+    // Pre-cargar movimientos asignados por mes para los 12 meses de proyección
+    const mesesKeys = [];
+    for (let i = 0; i < 12; i++) {
+      const f = new Date(hoy.getFullYear(), hoy.getMonth() + i, 1);
+      mesesKeys.push(`${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, '0')}`);
+    }
+    const movsAsignadosProyeccion = await Movement.find({
+      user: req.user._id,
+      'asignacion.tipo': { $ne: null },
+      'asignacion.mes': { $in: mesesKeys },
+    }).select('amount asignacion').lean();
+
+    // Agrupar pagos: { 'YYYY-MM' -> { 'tipo_refId' -> montoPagado } }
+    const pagosPorMes = {};
+    for (const mov of movsAsignadosProyeccion) {
+      const mk = mov.asignacion.mes;
+      if (!pagosPorMes[mk]) pagosPorMes[mk] = {};
+      const key = `${mov.asignacion.tipo}_${mov.asignacion.referenciaId}`;
+      pagosPorMes[mk][key] = (pagosPorMes[mk][key] || 0) + Math.abs(mov.amount);
+    }
+
+    // Mapa de deuda arrastrada: { deudaId -> montoAcumulado }
+    const deudaArrastrada = {};
+    const formatearMoneda = (v) => `$${Math.round(v).toLocaleString('es-CL')}`;
+
     for (let i = 0; i < 12; i++) {
       const fecha = new Date(hoy.getFullYear(), hoy.getMonth() + i, 1);
       const mesKey = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`;
       const mesLabel = fecha.toLocaleDateString('es-CL', { month: 'short', year: 'numeric' });
+      const esMesActualLoop = i === 0;
 
-      const ingMes = totalIngresos;
-      const cosMes = costos.filter((c) => costoActivoEnMes(c, fecha)).reduce((s, c) => s + c.monto, 0);
+      // Mes actual: ingresos reales; meses futuros: ingresos seguros
+      const ingMes = esMesActualLoop ? Math.round(ingresosRealesMes) : totalIngresos;
+
+      const costosFijosEsperados = costos.filter((c) => costoActivoEnMes(c, fecha)).reduce((s, c) => s + c.monto, 0);
+
+      // Mes actual: si gastaste menos en costos fijos, la diferencia es ahorro
+      let cosMes;
+      if (esMesActualLoop) {
+        cosMes = Math.min(gastosRealesCostosFijos, costosFijosEsperados);
+      } else {
+        cosMes = costosFijosEsperados;
+      }
+
+      const ahorroCostos = esMesActualLoop ? Math.max(0, costosFijosEsperados - gastosRealesCostosFijos) : 0;
+
       const deuMes = deudas.filter((d) => deudaActivaEnMes(d, fecha, i)).reduce((s, d) => s + d.cuotaMensual, 0);
 
-      // Items activos del mes
-      const items = [];
-      costos.filter((c) => costoActivoEnMes(c, fecha)).forEach((c) => {
-        items.push({ tipo: 'costo', nombre: c.nombre, monto: c.monto, detalle: c.tipoCompromiso === 'temporal' ? `Temporal (${c.duracion} meses)` : 'Permanente' });
+      // ===== Gastos variables (solo mes actual, no se proyectan) =====
+      const gastosVarMes = esMesActualLoop ? gastosVariablesMesActual : 0;
+
+      // ===== Arrastre de deudas impagas + interés moratorio =====
+      let arrasteMes = 0;
+      let interesMoraMes = 0;
+      const itemsArrastre = [];
+
+      if (esMesActualLoop) {
+        // Mes actual: detectar deudas parcialmente pagadas → generar arrastre para meses futuros
+        const pagosDelMesActual = pagosPorMes[mesKey] || {};
+        for (const d of deudas.filter((dd) => deudaActivaEnMes(dd, fecha, 0))) {
+          const keyD = `deuda_${d._id}`;
+          const pagado = pagosDelMesActual[keyD] || 0;
+          const faltante = Math.max(0, d.cuotaMensual - pagado);
+          if (faltante > 0) {
+            const dId = d._id.toString();
+            deudaArrastrada[dId] = (deudaArrastrada[dId] || 0) + faltante;
+          }
+        }
+      } else {
+        // Meses futuros: aplicar arrastre acumulado + interés moratorio
+        for (const dId of Object.keys(deudaArrastrada)) {
+          const montoArr = deudaArrastrada[dId];
+          if (montoArr <= 0) continue;
+          const deuda = deudas.find((d) => d._id.toString() === dId);
+          const tasaMensual = deuda ? (deuda.tasaInteres || 0) / 100 / 12 : 0;
+          const interes = Math.round(montoArr * tasaMensual);
+          arrasteMes += montoArr;
+          interesMoraMes += interes;
+          // El arrastre crece con el interés para el siguiente mes
+          deudaArrastrada[dId] = montoArr + interes;
+          itemsArrastre.push({
+            tipo: 'arrastre',
+            nombre: deuda ? deuda.nombre : 'Deuda',
+            montoEsperado: Math.round(montoArr + interes),
+            montoPagado: 0,
+            porcentaje: 0,
+            pagado: false,
+            detalle: `Mora: ${formatearMoneda(montoArr)} + interés ${formatearMoneda(interes)}`,
+          });
+        }
+      }
+
+      const flujoConDeuda = ingMes - cosMes - deuMes - gastosVarMes - arrasteMes - interesMoraMes;
+      const flujoSinDeuda = ingMes - cosMes - gastosVarMes;
+
+      saldoAcumuladoConDeuda += flujoConDeuda;
+      saldoAcumuladoSinDeuda += flujoSinDeuda;
+
+      // ===== Items detalle con estado de pago =====
+      const pagosDelMes = pagosPorMes[mesKey] || {};
+
+      const itemsCostos = costos.filter((c) => costoActivoEnMes(c, fecha)).map((c) => {
+        const key = `costoFijo_${c._id}`;
+        const pagado = pagosDelMes[key] || 0;
+        const pct = c.monto > 0 ? Math.min(100, Math.round((pagado / c.monto) * 100)) : 0;
+        return {
+          tipo: 'costo',
+          nombre: c.nombre,
+          montoEsperado: c.monto,
+          montoPagado: Math.round(pagado),
+          porcentaje: pct,
+          pagado: pct >= 100,
+        };
       });
-      deudas.filter((d) => deudaActivaEnMes(d, fecha, i)).forEach((d) => {
+
+      const itemsDeudas = deudas.filter((d) => deudaActivaEnMes(d, fecha, i)).map((d) => {
+        const key = `deuda_${d._id}`;
+        const pagado = pagosDelMes[key] || 0;
+        const objetivo = d.cuotaMensual || 0;
+        const pct = objetivo > 0 ? Math.min(100, Math.round((pagado / objetivo) * 100)) : 0;
         const cuotaNum = (d.cuotasPagadas || 0) + i + 1;
-        items.push({ tipo: 'deuda', nombre: d.nombre, monto: d.cuotaMensual, detalle: `Cuota ${cuotaNum}/${d.cuotasTotales} · ${SISTEMAS_LABEL[d.sistemaAmortizacion] || d.sistemaAmortizacion}` });
+        return {
+          tipo: 'deuda',
+          nombre: d.nombre,
+          montoEsperado: objetivo,
+          montoPagado: Math.round(pagado),
+          porcentaje: pct,
+          pagado: pct >= 100,
+          detalle: `Cuota ${cuotaNum}/${d.cuotasTotales}`,
+        };
       });
-      ingresos.forEach((ing) => {
-        items.push({ tipo: 'ingreso', nombre: ing.nombre, monto: ing.monto });
-      });
+
+      const allItems = [...itemsCostos, ...itemsDeudas, ...itemsArrastre];
+      const totalEsperado = itemsCostos.reduce((s, c) => s + c.montoEsperado, 0) + itemsDeudas.reduce((s, d) => s + d.montoEsperado, 0);
+      const totalPagadoMes = itemsCostos.reduce((s, c) => s + c.montoPagado, 0) + itemsDeudas.reduce((s, d) => s + d.montoPagado, 0);
+      const porcentajeGlobal = totalEsperado > 0 ? Math.min(100, Math.round((totalPagadoMes / totalEsperado) * 100)) : 0;
 
       proyeccion.push({
         mes: mesKey,
         mesLabel,
+        esActual: esMesActualLoop,
         ingresos: Math.round(ingMes),
-        costos: Math.round(cosMes),
+        costosFijos: Math.round(cosMes),
+        costosFijosEsperados: Math.round(costosFijosEsperados),
+        ahorroCostos: Math.round(ahorroCostos),
         deudas: Math.round(deuMes),
-        flujo: Math.round(ingMes - cosMes - deuMes),
-        items,
+        gastosVariables: Math.round(gastosVarMes),
+        arrastre: Math.round(arrasteMes),
+        interesMoratorio: Math.round(interesMoraMes),
+        flujoConDeuda: Math.round(flujoConDeuda),
+        flujoSinDeuda: Math.round(flujoSinDeuda),
+        saldoAcumuladoConDeuda: Math.round(saldoAcumuladoConDeuda),
+        saldoAcumuladoSinDeuda: Math.round(saldoAcumuladoSinDeuda),
+        items: allItems,
+        totalEsperado: Math.round(totalEsperado),
+        totalPagadoMes: Math.round(totalPagadoMes),
+        porcentajeGlobal,
       });
     }
 
@@ -329,6 +530,14 @@ router.get('/resumen', async (req, res) => {
       cantidadDeudas: deudas.length,
       desgloseCostos,
       proyeccion,
+      ingresosRealesMes: Math.round(ingresosRealesMes),
+      gastosRealesMes: Math.round(gastosRealesMes),
+      totalAcumuladoCostos: Math.round(totalAcumuladoCostos),
+      totalAcumuladoDeudas: Math.round(totalAcumuladoDeudas),
+      acumuladoCostos,
+      acumuladoDeudas,
+      saldoInicial: Math.round(saldoInicial),
+      gastosVariablesMesActual: Math.round(gastosVariablesMesActual),
     });
   } catch (error) {
     console.error('Error generando resumen obligaciones:', error.message);

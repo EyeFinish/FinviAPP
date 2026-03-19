@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contextos/AuthContext';
-import { LogOut } from 'lucide-react';
+import { LogOut, Settings } from 'lucide-react';
 import '../estilos/navbar.css';
 import '../estilos/auth.css';
 
@@ -39,6 +39,9 @@ function BarraNavegacion() {
               <span className="navbar-usuario-nombre">{user.nombre}</span>
               <span className="navbar-usuario-email">{user.email}</span>
             </div>
+            <button className="navbar-btn-config" onClick={() => navigate('/configuracion')} title="Configuración">
+              <Settings size={16} />
+            </button>
             <button className="navbar-btn-salir" onClick={handleLogout}>
               <LogOut size={14} /> Salir
             </button>

@@ -1,8 +1,26 @@
 import { useState, useEffect, useCallback } from 'react';
-import { obtenerEstadoFinanciero, resincronizarDatos } from '../servicios/api';
+import { obtenerEstadoFinanciero, resincronizarDatos, obtenerCategoriasDisponibles, categorizarMovimiento } from '../servicios/api';
 import { formatearMoneda, formatearFecha } from '../utilidades/formateadores';
-import { TrendingUp, TrendingDown, Wallet, ChevronLeft, ChevronRight, BarChart3, List, Loader, RefreshCw, ChevronDown } from 'lucide-react';
+import { TrendingUp, TrendingDown, Wallet, ChevronLeft, ChevronRight, BarChart3, List, Loader, RefreshCw, ChevronDown, ArrowLeftRight, Repeat, ShoppingCart, Car, Utensils, Wifi, Heart, Home, GraduationCap, ShieldCheck, ShoppingBag, ArrowRightLeft, Banknote, MoreHorizontal, Bike, Plus, X } from 'lucide-react';
 import '../estilos/estado.css';
+
+// Mapa de icono backend → componente lucide-react
+const ICON_MAP = {
+  'cart': ShoppingCart,
+  'bicycle': Bike,
+  'car': Car,
+  'restaurant': Utensils,
+  'refresh-circle': Repeat,
+  'wifi': Wifi,
+  'medkit': Heart,
+  'home': Home,
+  'school': GraduationCap,
+  'shield-checkmark': ShieldCheck,
+  'bag-handle': ShoppingBag,
+  'swap-horizontal': ArrowRightLeft,
+  'cash': Banknote,
+  'ellipsis-horizontal': MoreHorizontal,
+};
 
 function EstadoFinanciero() {
   const hoy = new Date();
@@ -14,6 +32,8 @@ function EstadoFinanciero() {
   const [vista, setVista] = useState('categoria');
   const [resyncLoading, setResyncLoading] = useState(false);
   const [expandido, setExpandido] = useState(null);
+  const [moverItem, setMoverItem] = useState(null); // { descripcion }
+  const [catDisponibles, setCatDisponibles] = useState([]);
 
   const toggleExpandir = (key) => {
     setExpandido((prev) => (prev === key ? null : key));
@@ -48,6 +68,27 @@ function EstadoFinanciero() {
     cargar();
   }, [cargar]);
 
+  const abrirMover = async (descripcion) => {
+    try {
+      const cats = await obtenerCategoriasDisponibles();
+      setCatDisponibles(cats.filter(c => c.nombre !== 'Otros'));
+      setMoverItem({ descripcion });
+    } catch (err) {
+      console.error('Error cargando categorías:', err);
+    }
+  };
+
+  const confirmarMover = async (categoria) => {
+    if (!moverItem) return;
+    try {
+      await categorizarMovimiento(moverItem.descripcion, categoria);
+      setMoverItem(null);
+      await cargar();
+    } catch (err) {
+      console.error('Error moviendo categoría:', err);
+    }
+  };
+
   const cambiarMes = (delta) => {
     const [a, m] = mes.split('-').map(Number);
     const d = new Date(a, m - 1 + delta, 1);
@@ -67,9 +108,14 @@ function EstadoFinanciero() {
 
   if (!estado) return null;
 
-  const { resumen, categorias, porTipo, topGastos, topIngresos } = estado;
+  const { resumen, categorias, porTipo, topGastos, topIngresos, transferenciasInternas, suscripciones } = estado;
   const ingresosCateg = categorias.filter((c) => c.tipo === 'ingreso');
   const gastosCateg = categorias.filter((c) => c.tipo === 'gasto');
+
+  const getIcono = (iconName, size = 16, color) => {
+    const Comp = ICON_MAP[iconName] || MoreHorizontal;
+    return <Comp size={size} color={color} />;
+  };
 
   return (
     <div className="ef">
@@ -123,6 +169,16 @@ function EstadoFinanciero() {
             </div>
           </div>
 
+          {/* Banner transferencias internas */}
+          {transferenciasInternas && transferenciasInternas.cantidad > 0 && (
+            <div className="ef-transferencias-banner">
+              <ArrowLeftRight size={18} />
+              <span>
+                Se excluyeron <strong>{transferenciasInternas.cantidad}</strong> transferencias entre tus cuentas por <strong>{formatearMoneda(transferenciasInternas.monto)}</strong>
+              </span>
+            </div>
+          )}
+
           {/* Toggle vista */}
           <div className="ef-vista-toggle">
             <button
@@ -155,7 +211,10 @@ function EstadoFinanciero() {
                       <div key={i} className="ef-item-wrap">
                         <div className="ef-item ef-item-clickable" onClick={() => toggleExpandir(key)}>
                           <div className="ef-item-info">
-                            <span className="ef-item-nombre">{c.nombre}</span>
+                            <span className="ef-item-nombre">
+                              <span className="ef-item-icono" style={{ color: c.color }}>{getIcono(c.icono, 16, c.color)}</span>
+                              {c.nombre}
+                            </span>
                             <span className="ef-item-cantidad">{c.cantidad} mov.</span>
                           </div>
                           <div className="ef-item-barra-container">
@@ -172,9 +231,16 @@ function EstadoFinanciero() {
                               <div key={j} className="ef-detalle-item">
                                 <div className="ef-detalle-desc">
                                   <span>{m.descripcion}</span>
-                                  <span className="ef-detalle-meta">{formatearFecha(m.fecha)} · {m.cuenta}</span>
+                                  <span className="ef-detalle-meta">{m.cantidad} {m.cantidad === 1 ? 'movimiento' : 'movimientos'}</span>
                                 </div>
-                                <span className="ef-detalle-monto ingreso">+{formatearMoneda(m.monto)}</span>
+                                <div className="ef-detalle-acciones">
+                                  {c.nombre === 'Otros' && (
+                                    <button className="ef-mover-btn" onClick={(e) => { e.stopPropagation(); abrirMover(m.descripcion); }} title="Mover a otra categoría">
+                                      <Plus size={14} />
+                                    </button>
+                                  )}
+                                  <span className="ef-detalle-monto ingreso">{formatearMoneda(m.monto)}</span>
+                                </div>
                               </div>
                             ))}
                           </div>
@@ -198,7 +264,10 @@ function EstadoFinanciero() {
                       <div key={i} className="ef-item-wrap">
                         <div className="ef-item ef-item-clickable" onClick={() => toggleExpandir(key)}>
                           <div className="ef-item-info">
-                            <span className="ef-item-nombre">{c.nombre}</span>
+                            <span className="ef-item-nombre">
+                              <span className="ef-item-icono" style={{ color: c.color }}>{getIcono(c.icono, 16, c.color)}</span>
+                              {c.nombre}
+                            </span>
                             <span className="ef-item-cantidad">{c.cantidad} mov.</span>
                           </div>
                           <div className="ef-item-barra-container">
@@ -215,9 +284,16 @@ function EstadoFinanciero() {
                               <div key={j} className="ef-detalle-item">
                                 <div className="ef-detalle-desc">
                                   <span>{m.descripcion}</span>
-                                  <span className="ef-detalle-meta">{formatearFecha(m.fecha)} · {m.cuenta}</span>
+                                  <span className="ef-detalle-meta">{m.cantidad} {m.cantidad === 1 ? 'movimiento' : 'movimientos'}</span>
                                 </div>
-                                <span className="ef-detalle-monto gasto">{formatearMoneda(m.monto)}</span>
+                                <div className="ef-detalle-acciones">
+                                  {c.nombre === 'Otros' && (
+                                    <button className="ef-mover-btn" onClick={(e) => { e.stopPropagation(); abrirMover(m.descripcion); }} title="Mover a otra categoría">
+                                      <Plus size={14} />
+                                    </button>
+                                  )}
+                                  <span className="ef-detalle-monto gasto">{formatearMoneda(m.monto)}</span>
+                                </div>
                               </div>
                             ))}
                           </div>
@@ -252,6 +328,28 @@ function EstadoFinanciero() {
                         <span className="ef-item-monto gasto">-{formatearMoneda(t.montoGastos)}</span>
                       )}
                     </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Suscripciones detectadas */}
+          {suscripciones && suscripciones.length > 0 && (
+            <div className="ef-suscripciones">
+              <div className="ef-suscripciones-header">
+                <Repeat size={18} />
+                <span>Suscripciones detectadas</span>
+                <span className="ef-suscripciones-badge">{suscripciones.length}</span>
+              </div>
+              <div className="ef-suscripciones-lista">
+                {suscripciones.map((s, i) => (
+                  <div key={i} className="ef-suscripcion-item">
+                    <span className="ef-suscripcion-icono" style={{ color: s.color }}>{getIcono(s.icono, 18, s.color)}</span>
+                    <div className="ef-suscripcion-info">
+                      <span className="ef-suscripcion-nombre">{s.descripcion}</span>
+                    </div>
+                    <span className="ef-suscripcion-monto">{formatearMoneda(s.monto)}</span>
                   </div>
                 ))}
               </div>
@@ -317,6 +415,29 @@ function EstadoFinanciero() {
             )}
           </div>
         </>
+      )}
+
+      {/* Modal seleccionar categoría */}
+      {moverItem && (
+        <div className="ef-modal-overlay" onClick={() => setMoverItem(null)}>
+          <div className="ef-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="ef-modal-header">
+              <span className="ef-modal-titulo">Mover a categoría</span>
+              <button className="ef-modal-cerrar" onClick={() => setMoverItem(null)}><X size={18} /></button>
+            </div>
+            <p className="ef-modal-desc">
+              <strong>{moverItem.descripcion}</strong> se moverá y siempre se reconocerá en la categoría elegida.
+            </p>
+            <div className="ef-modal-lista">
+              {catDisponibles.map((cat) => (
+                <button key={cat.nombre} className="ef-modal-cat" onClick={() => confirmarMover(cat.nombre)}>
+                  <span className="ef-modal-cat-icono" style={{ color: cat.color }}>{getIcono(cat.icono, 20, cat.color)}</span>
+                  <span>{cat.nombre}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

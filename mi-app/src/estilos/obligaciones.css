@@ -317,82 +317,365 @@
   transition: width 0.5s ease;
 }
 
-/* Proyección */
+/* Proyección - Flujo de caja */
+.ob-proy-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
 .ob-proy-titulo {
   font-size: 18px;
   font-weight: 700;
   color: #111827;
-  margin-bottom: 20px;
+  margin: 0;
 }
-.ob-proy-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-  gap: 12px;
-}
-.ob-proy-card {
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-  overflow: hidden;
-}
-.ob-proy-card-header {
+
+/* Toggle escenarios */
+.ob-escenario-toggle {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 18px;
+  gap: 4px;
+  background: #f3f4f6;
+  padding: 3px;
+  border-radius: 10px;
+}
+.ob-escenario-btn {
+  padding: 7px 16px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6b7280;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: all 0.15s;
 }
-.ob-proy-card-header:hover { background: #f9fafb; }
-.ob-proy-mes {
-  font-size: 14px;
-  font-weight: 700;
-  color: #374151;
-  text-transform: capitalize;
+.ob-escenario-btn.activo {
+  background: #fff;
+  color: #111827;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
 }
-.ob-proy-flujo {
-  font-size: 15px;
-  font-weight: 800;
+
+/* Tabla flujo de caja */
+.ob-flujo-tabla-wrapper {
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  overflow-x: auto;
 }
-.ob-proy-flujo.positivo { color: #059669; }
-.ob-proy-flujo.negativo { color: #dc2626; }
-.ob-proy-detalle {
-  padding: 0 18px 14px;
-  border-top: 1px solid #f3f4f6;
-}
-.ob-proy-fila {
-  display: flex;
-  justify-content: space-between;
-  padding: 6px 0;
+.ob-flujo-tabla {
+  width: 100%;
+  border-collapse: collapse;
   font-size: 13px;
 }
-.ob-proy-fila.ingreso span:last-child { color: #059669; font-weight: 600; }
-.ob-proy-fila.gasto span:last-child { color: #dc2626; font-weight: 600; }
-.ob-proy-separador {
-  border-top: 1px dashed #e5e7eb;
-  margin: 8px 0;
+.ob-flujo-tabla thead th {
+  text-align: right;
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #9ca3af;
+  padding: 12px 16px;
+  border-bottom: 2px solid #f3f4f6;
+  white-space: nowrap;
 }
-.ob-proy-venc-titulo {
+.ob-flujo-th-mes { text-align: left !important; }
+.ob-flujo-tabla tbody td {
+  padding: 11px 16px;
+  text-align: right;
+  color: #374151;
+  border-bottom: 1px solid #f8f9fa;
+  white-space: nowrap;
+}
+.ob-flujo-tabla tbody tr:last-child td { border-bottom: none; }
+.ob-flujo-tabla tbody tr:hover { background: #fafbfc; }
+
+/* Fila clickeable */
+.ob-flujo-fila-click { cursor: pointer; }
+.ob-flujo-fila-click:hover { background: #f5f6f8 !important; }
+.ob-flujo-chevron {
+  color: #9ca3af;
+  transition: transform 0.2s;
+  flex-shrink: 0;
+}
+.ob-flujo-chevron.abierto { transform: rotate(180deg); }
+
+/* Fila mes actual */
+.ob-flujo-actual { background: #f0f4ff; }
+.ob-flujo-actual:hover { background: #e8eeff !important; }
+
+.ob-flujo-td-mes {
+  text-align: left !important;
+  font-weight: 600;
+  color: #374151;
+  text-transform: capitalize;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ob-flujo-badge-hoy {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: #4f46e5;
+  color: #fff;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+.ob-flujo-nota {
+  display: block;
+  font-size: 10px;
+  font-weight: 500;
+  color: #6b7280;
+  font-style: italic;
+}
+.ob-flujo-ingreso { color: #059669; font-weight: 600; }
+.ob-flujo-gasto { color: #6b7280; }
+.ob-flujo-deuda { color: #d97706; }
+.ob-flujo-deuda.pagadas { color: #059669; }
+.ob-flujo-deuda-monto {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+}
+.ob-flujo-deuda-estado {
+  display: inline-flex;
+  align-items: center;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 6px;
+  line-height: 1;
+}
+.ob-flujo-deuda-estado.ok {
+  color: #059669;
+}
+.ob-flujo-deuda-estado.pend {
+  background: #fef3c7;
+  color: #b45309;
+}
+.ob-flujo-ahorro {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #10b981;
+  margin-top: 2px;
+}
+.ob-flujo-flujo { font-weight: 700; }
+.ob-flujo-flujo.positivo { color: #059669; }
+.ob-flujo-flujo.negativo { color: #dc2626; }
+.ob-flujo-acum { font-weight: 700; font-size: 12px; }
+.ob-flujo-acum.positivo { color: #2563eb; }
+.ob-flujo-acum.negativo { color: #ef4444; }
+
+/* Gastos variables */
+.ob-flujo-variable { color: #8b5cf6; font-size: 12px; }
+.ob-flujo-variable-nota {
+  display: block;
+  font-size: 9px;
+  font-weight: 500;
+  color: #a78bfa;
+  font-style: italic;
+}
+
+/* Mora badge en celda de deudas */
+.ob-flujo-mora-badge {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #ef4444;
+  margin-top: 2px;
+}
+
+/* Saldo inicial banner */
+.ob-flujo-saldo-inicial {
+  background: #f0f4ff;
+  border: 1px solid #dbe4ff;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 12px;
+  color: #4f46e5;
+  margin-bottom: 10px;
+}
+.ob-flujo-saldo-inicial strong { font-weight: 700; }
+
+/* Expandable detail row */
+.ob-flujo-detalle-row { background: #f8faff; }
+.ob-flujo-detalle-cell {
+  padding: 12px 16px !important;
+  border-top: none !important;
+}
+
+/* Global progress bar */
+.ob-flujo-barra-global { margin-bottom: 12px; }
+.ob-flujo-barra-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #6b7280;
+  margin-bottom: 4px;
+}
+.ob-flujo-barra-fondo {
+  height: 6px;
+  background: #e5e7eb;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.ob-flujo-barra-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #6366f1, #818cf8);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+/* Item groups */
+.ob-flujo-grupo { margin-bottom: 10px; }
+.ob-flujo-grupo-titulo {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #374151;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #e5e7eb;
+}
+.ob-flujo-grupo-arrastre .ob-flujo-grupo-titulo {
+  color: #ef4444;
+  border-bottom-color: #fecaca;
+}
+
+/* Item row */
+.ob-flujo-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  font-size: 12px;
+}
+.ob-flujo-item.pagado { opacity: 0.65; }
+.ob-flujo-item-icon { flex-shrink: 0; display: flex; }
+.ob-icon-pagado { color: #10b981; }
+.ob-icon-pendiente { color: #d1d5db; }
+.ob-icon-arrastre { color: #ef4444; }
+
+.ob-flujo-item-info { flex: 1; min-width: 0; }
+.ob-flujo-item-nombre {
+  font-weight: 600;
+  color: #1f2937;
+  font-size: 12px;
+}
+.ob-flujo-item-nombre-row {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
-  font-weight: 700;
-  color: #6b7280;
-  margin-bottom: 6px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
 }
-.ob-proy-venc {
+.ob-flujo-item-cuota {
+  font-size: 10px;
+  color: #9ca3af;
+  font-weight: 500;
+}
+
+/* Item progress bar */
+.ob-flujo-item-barra-fondo {
+  height: 4px;
+  background: #e5e7eb;
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 3px;
+}
+.ob-flujo-item-barra {
+  height: 100%;
+  background: #818cf8;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+.ob-flujo-item-barra.completa { background: #10b981; }
+.ob-flujo-item-barra.deuda { background: #f59e0b; }
+.ob-flujo-item-barra.deuda.completa { background: #10b981; }
+
+/* Item amounts */
+.ob-flujo-item-montos {
+  flex-shrink: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  font-size: 11px;
+}
+.ob-monto-pagado { color: #10b981; font-weight: 600; }
+.ob-monto-pendiente { color: #ef4444; font-weight: 600; }
+.ob-monto-esperado { color: #9ca3af; font-weight: 400; }
+
+/* Arrastre item */
+.ob-flujo-arrastre {
+  background: #fef2f2;
+  border-radius: 6px;
+  padding: 6px 8px !important;
+  margin-bottom: 4px;
+}
+
+/* Empty state */
+.ob-flujo-sin-items {
+  text-align: center;
+  color: #9ca3af;
+  font-size: 12px;
+  padding: 10px 0;
+  font-style: italic;
+}
+
+/* Leyenda variable */
+.ob-leyenda-variable {
+  color: #8b5cf6 !important;
+  font-style: italic;
+}
+
+/* Leyenda */
+.ob-flujo-leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 14px;
+  padding: 0 4px;
+}
+.ob-flujo-leyenda > span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #9ca3af;
+}
+.ob-leyenda-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+.ob-leyenda-dot.actual { background: #4f46e5; }
+.ob-leyenda-ahorro { color: #10b981; }
+
+/* Acumulados (costos y deudas) */
+.ob-lista-acumulado {
   display: flex;
   justify-content: space-between;
-  padding: 4px 0;
-  font-size: 12px;
-  color: #6b7280;
+  padding: 12px 20px;
+  background: #f0f4ff;
+  font-size: 13px;
+  font-weight: 600;
+  color: #4f46e5;
+  border-top: 1px dashed #dbe4ff;
 }
-.ob-proy-venc.ingreso span:last-child { color: #059669; }
-.ob-proy-venc.costo span:last-child { color: #dc2626; }
-.ob-proy-venc.deuda span:last-child { color: #d97706; }
 
 /* Modal */
 .ob-modal-overlay {
@@ -612,12 +895,17 @@
   .ob-metricas { grid-template-columns: repeat(2, 1fr); }
   .ob-riesgo-cards { grid-template-columns: 1fr; }
   .ob-preview-grid { grid-template-columns: 1fr; }
+  .ob-proy-header { flex-direction: column; align-items: flex-start; }
 }
 @media (max-width: 600px) {
   .ob-metricas { grid-template-columns: 1fr; }
   .ob-tabs { flex-wrap: nowrap; }
   .ob-deudas-grid { grid-template-columns: 1fr; }
-  .ob-proy-grid { grid-template-columns: 1fr; }
   .ob-form-row { grid-template-columns: 1fr; }
   .ob-toggle-row { flex-direction: column; }
+  .ob-flujo-tabla { font-size: 12px; }
+  .ob-flujo-tabla thead th { padding: 10px 10px; }
+  .ob-flujo-tabla tbody td { padding: 9px 10px; }
+  .ob-escenario-toggle { width: 100%; }
+  .ob-escenario-btn { flex: 1; text-align: center; }
 }
