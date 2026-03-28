@@ -29,6 +29,7 @@ function EstadoFinanciero() {
   const [mes, setMes] = useState(mesInicial);
   const [estado, setEstado] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [errorCarga, setErrorCarga] = useState(null);
   const [vista, setVista] = useState('categoria');
   const [resyncLoading, setResyncLoading] = useState(false);
   const [expandido, setExpandido] = useState(null);
@@ -55,10 +56,12 @@ function EstadoFinanciero() {
   const cargar = useCallback(async () => {
     try {
       setLoading(true);
+      setErrorCarga(null);
       const data = await obtenerEstadoFinanciero(mes);
       setEstado(data);
     } catch (err) {
       console.error('Error cargando estado financiero:', err);
+      setErrorCarga('No se pudo cargar el estado financiero. Verifica tu conexión e intenta nuevamente.');
     } finally {
       setLoading(false);
     }
@@ -102,6 +105,14 @@ function EstadoFinanciero() {
       <div className="ef-loading">
         <Loader size={32} className="icon-spin" />
         <p>Analizando tus movimientos...</p>
+      </div>
+    );
+  }
+
+  if (errorCarga) {
+    return (
+      <div className="ef-loading">
+        <p style={{ color: '#ef4444' }}>{errorCarga}</p>
       </div>
     );
   }

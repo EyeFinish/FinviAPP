@@ -2,7 +2,6 @@ import { Tabs, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, FontSize } from '../../constants/theme';
 import { useAuth } from '../../contexts/AuthContext';
-import { Redirect } from 'expo-router';
 import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet, Alert } from 'react-native';
 
 function HeaderRight() {
@@ -15,7 +14,14 @@ function HeaderRight() {
       '¿Seguro que quieres cerrar la sesión?',
       [
         { text: 'Cancelar', style: 'cancel' },
-        { text: 'Cerrar sesión', style: 'destructive', onPress: logout },
+        {
+          text: 'Cerrar sesión',
+          style: 'destructive',
+          onPress: async () => {
+            await logout();
+            router.replace('/(auth)/login');
+          },
+        },
       ]
     );
   };
@@ -43,8 +49,8 @@ function HeaderTitle({ title }) {
 }
 
 const hs = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: 2, marginRight: 8 },
-  btn: { padding: 8, borderRadius: 20 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 2, marginRight: 8, zIndex: 10 },
+  btn: { padding: 12, borderRadius: 20, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   title: { color: '#fff', fontWeight: '700', fontSize: FontSize.md },
   subtitle: { color: 'rgba(255,255,255,0.7)', fontSize: FontSize.xs },
 });
@@ -60,7 +66,7 @@ export default function TabLayout() {
     );
   }
 
-  if (!user) return <Redirect href="/(auth)/login" />;
+  if (!user) return null;
 
   return (
     <Tabs
@@ -68,7 +74,7 @@ export default function TabLayout() {
         headerStyle: {
           backgroundColor: 'transparent',
           elevation: 0,
-          shadowOpacity: 0,
+          boxShadow: 'none',
           borderBottomWidth: 0,
         },
         headerBackground: () => (
@@ -76,6 +82,7 @@ export default function TabLayout() {
             position: 'absolute', top: 8, left: 12, right: 12, bottom: 0,
             backgroundColor: Colors.primario,
             borderRadius: 20,
+            pointerEvents: 'none',
           }} />
         ),
         headerTintColor: '#fff',
@@ -94,10 +101,7 @@ export default function TabLayout() {
           borderTopWidth: 0,
           paddingBottom: 0,
           paddingTop: 0,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.12,
-          shadowRadius: 12,
+          boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.12)',
           elevation: 8,
         },
         tabBarLabelStyle: { fontSize: 10, fontWeight: '600', marginBottom: 8 },

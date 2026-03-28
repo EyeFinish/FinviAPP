@@ -37,7 +37,7 @@ function TarjetaCredito({ credito, onEliminar }) {
         .catch(() => setTransacciones([]))
         .finally(() => setCargandoTxs(false));
     }
-  }, [mostrarTxs, esRotativo, esLineaCredito, credito.fintocAccountId, credito.id, credito._id, transacciones.length]);
+  }, [mostrarTxs, esRotativo, esLineaCredito, credito.fintocAccountId, credito.id, credito._id]);
 
   // Vista para créditos rotativos
   if (esRotativo) {

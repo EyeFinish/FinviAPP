@@ -47,6 +47,7 @@ export function AuthProvider({ children }) {
   };
 
   const actualizarUsuario = (nuevosDatos) => {
+    if (!user) return;
     const updated = { ...user, ...nuevosDatos };
     setUser(updated);
     localStorage.setItem('finvi_user', JSON.stringify(updated));

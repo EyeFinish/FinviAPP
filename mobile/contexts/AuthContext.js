@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { getItem, setItem, deleteItem } from '../utils/storage';
-import { obtenerUsuarioActual } from '../services/api';
+import { obtenerUsuarioActual, setOnUnauthorized } from '../services/api';
 
 const AuthContext = createContext(null);
 
@@ -10,6 +10,9 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     verificarAuth();
+    // Registrar callback para 401 → cierra sesión en el estado React
+    setOnUnauthorized(() => setUser(null));
+    return () => setOnUnauthorized(null);
   }, []);
 
   const verificarAuth = async () => {
@@ -31,21 +34,34 @@ export function AuthProvider({ children }) {
   };
 
   const login = async (token, userData) => {
-    await setItem('finvi_token', token);
-    await setItem('finvi_user', JSON.stringify(userData));
+    try {
+      await setItem('finvi_token', token);
+      await setItem('finvi_user', JSON.stringify(userData));
+    } catch {
+      // Si falla el storage, el login sigue funcionando en memoria
+    }
     setUser(userData);
   };
 
   const logout = async () => {
-    await deleteItem('finvi_token');
-    await deleteItem('finvi_user');
+    try {
+      await deleteItem('finvi_token');
+      await deleteItem('finvi_user');
+    } catch {
+      // Ignorar error de storage, igual cerramos sesión
+    }
     setUser(null);
   };
 
   const actualizarUsuario = async (nuevosDatos) => {
+    if (!user) return;
     const updated = { ...user, ...nuevosDatos };
     setUser(updated);
-    await setItem('finvi_user', JSON.stringify(updated));
+    try {
+      await setItem('finvi_user', JSON.stringify(updated));
+    } catch {
+      // Si falla el storage, el estado en memoria ya fue actualizado
+    }
   };
 
   return (

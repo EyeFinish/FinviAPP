@@ -29,7 +29,13 @@ export default function Login() {
       await login(res.data.token, res.data.user);
       router.replace('/(tabs)');
     } catch (err) {
-      setError(err.response?.data?.message || 'Error al iniciar sesión');
+      if (err.response?.data?.message) {
+        setError(err.response.data.message);
+      } else if (err.request) {
+        setError('No se pudo conectar al servidor. Revisa tu conexión a internet.');
+      } else {
+        setError('Error al iniciar sesión');
+      }
     } finally {
       setCargando(false);
     }
@@ -126,7 +132,7 @@ const styles = StyleSheet.create({
   subtitulo: { fontSize: FontSize.md, color: 'rgba(255,255,255,0.7)', marginTop: 4 },
   card: {
     backgroundColor: '#fff', borderRadius: BorderRadius.lg, padding: Spacing.lg,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 6,
+    boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.1)', elevation: 6,
   },
   titulo: { fontSize: FontSize.xl, fontWeight: '700', color: Colors.texto, textAlign: 'center', marginBottom: 20 },
   errorBox: {

@@ -432,7 +432,7 @@ const styles = StyleSheet.create({
   miniCard: {
     backgroundColor: '#fff', borderRadius: BorderRadius.md, padding: Spacing.md,
     alignItems: 'center', elevation: 3,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.06)',
   },
   miniLabel: { fontSize: FontSize.xs, color: Colors.textoSecundario, marginTop: 6 },
   miniValor: { fontSize: FontSize.md, fontWeight: '700', marginTop: 4 },
@@ -441,7 +441,7 @@ const styles = StyleSheet.create({
   netoCard: {
     backgroundColor: '#fff', borderRadius: BorderRadius.md, marginHorizontal: Spacing.lg,
     marginTop: Spacing.md, padding: Spacing.md, elevation: 3,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.06)',
   },
   netoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   netoLabel: { fontSize: FontSize.sm, color: Colors.textoSecundario },
@@ -467,7 +467,7 @@ const styles = StyleSheet.create({
   grupoCard: {
     backgroundColor: '#fff', borderRadius: BorderRadius.lg, marginHorizontal: Spacing.lg,
     marginTop: Spacing.md, padding: Spacing.md, elevation: 3,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.06)',
   },
   grupoHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: Colors.borde },
   grupoTitulo: { fontSize: FontSize.md, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
@@ -513,7 +513,7 @@ const styles = StyleSheet.create({
   topCard: {
     backgroundColor: '#fff', borderRadius: BorderRadius.lg, marginHorizontal: Spacing.lg,
     marginTop: Spacing.md, padding: Spacing.md, elevation: 3,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.06)',
   },
   topTitulo: { fontSize: FontSize.md, fontWeight: '700', color: Colors.texto, marginBottom: 12 },
   topItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f5f5f5' },

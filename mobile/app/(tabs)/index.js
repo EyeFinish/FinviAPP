@@ -9,8 +9,8 @@ import Svg, { Circle } from 'react-native-svg';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   obtenerCuentas,
-  obtenerProgresoMensual, obtenerMovimientosSinAsignar,
-  asignarMovimiento, desasignarMovimiento,
+  obtenerProgresoMensual, obtenerSinAsignarAgrupados,
+  asignarMovimiento, desasignarMovimiento, autoAsignarMovimientos,
   obtenerCostosFijos, obtenerDeudas,
 } from '../../services/api';
 import { formatearMoneda, formatearFecha, calcularSaludFinanciera } from '../../utils/formateadores';
@@ -55,8 +55,10 @@ export default function Dashboard() {
 
   // Estado para compromisos mensuales
   const [progreso, setProgreso] = useState(null);
-  const [sinAsignar, setSinAsignar] = useState([]);
+  const [categoriasAgrupadas, setCategoriasAgrupadas] = useState([]);
+  const [totalSinAsignar, setTotalSinAsignar] = useState(0);
   const [obligacionesLista, setObligacionesLista] = useState([]);
+  const [expandedCat, setExpandedCat] = useState(null);
 
   // Totales combinados (créditos + obligaciones)
   const [resumenOblig, setResumenOblig] = useState({ totalDeuda: 0, compromisoMensual: 0 });
@@ -66,6 +68,11 @@ export default function Dashboard() {
   const [movimientoSeleccionado, setMovimientoSeleccionado] = useState(null);
   const [asignando, setAsignando] = useState(false);
 
+  // Auto-asignar
+  const [autoAsignando, setAutoAsignando] = useState(false);
+  const [modalAutoAsignar, setModalAutoAsignar] = useState(false);
+  const [previewAutoAsignar, setPreviewAutoAsignar] = useState(null);
+
   const mesActual = () => {
     const hoy = new Date();
     return `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
@@ -74,16 +81,19 @@ export default function Dashboard() {
   const cargarDatos = async () => {
     try {
       const mes = mesActual();
-      const [resCuentas, resProgreso, resSinAsignar, resCostos, resDeudas] = await Promise.all([
+      const [resCuentas, resProgreso, resAgrupados, resCostos, resDeudas] = await Promise.all([
         obtenerCuentas().catch(() => ({ data: [] })),
         obtenerProgresoMensual(mes).catch(() => ({ data: null })),
-        obtenerMovimientosSinAsignar(mes).catch(() => ({ data: [] })),
+        obtenerSinAsignarAgrupados(mes).catch(() => ({ data: { categorias: [], totalMovimientos: 0 } })),
         obtenerCostosFijos().catch(() => ({ data: [] })),
         obtenerDeudas().catch(() => ({ data: [] })),
       ]);
       setCuentas(resCuentas.data || []);
       setProgreso(resProgreso.data);
-      setSinAsignar(resSinAsignar.data || []);
+
+      const agrupados = resAgrupados.data || { categorias: [], totalMovimientos: 0 };
+      setCategoriasAgrupadas(agrupados.categorias || []);
+      setTotalSinAsignar(agrupados.totalMovimientos || 0);
 
       // Datos crudos de obligaciones
       const rawCostos = resCostos.data || [];
@@ -164,6 +174,49 @@ export default function Dashboard() {
       await cargarDatos();
     } catch {
       // silenciar
+    }
+  };
+
+  const handleAutoAsignarPreview = async () => {
+    setAutoAsignando(true);
+    try {
+      const res = await autoAsignarMovimientos(mesActual(), 'preview');
+      setPreviewAutoAsignar(res.data);
+      setModalAutoAsignar(true);
+    } catch {
+      // silenciar
+    } finally {
+      setAutoAsignando(false);
+    }
+  };
+
+  const handleAutoAsignarConfirmar = async () => {
+    setAutoAsignando(true);
+    try {
+      await autoAsignarMovimientos(mesActual(), 'aplicar');
+      setModalAutoAsignar(false);
+      setPreviewAutoAsignar(null);
+      await cargarDatos();
+    } catch {
+      // silenciar
+    } finally {
+      setAutoAsignando(false);
+    }
+  };
+
+  const handleAsignarTodosCategoria = async (cat) => {
+    if (!cat.obligacionesSugeridas || cat.obligacionesSugeridas.length !== 1) return;
+    const oblig = cat.obligacionesSugeridas[0];
+    setAsignando(true);
+    try {
+      for (const mov of cat.movimientos) {
+        await asignarMovimiento(mov._id, oblig.tipo, oblig._id);
+      }
+      await cargarDatos();
+    } catch {
+      // silenciar
+    } finally {
+      setAsignando(false);
     }
   };
 
@@ -284,42 +337,112 @@ export default function Dashboard() {
         </View>
       )}
 
-      {/* ====== TRANSACCIONES SIN ASIGNAR ====== */}
-      {sinAsignar.length > 0 && (
+      {/* ====== TRANSACCIONES SIN ASIGNAR (AGRUPADAS POR CATEGORÍA) ====== */}
+      {categoriasAgrupadas.length > 0 && (
         <View style={styles.card}>
           <View style={styles.compromisoHeader}>
             <Text style={styles.cardTitulo}>Transacciones sin asignar</Text>
-            <View style={[styles.progresoBadge, { backgroundColor: '#fef2f2' }]}>
-              <Text style={[styles.progresoBadgeTexto, { color: Colors.error }]}>{sinAsignar.length}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <TouchableOpacity
+                style={styles.btnAutoAsignar}
+                onPress={handleAutoAsignarPreview}
+                disabled={autoAsignando}
+                activeOpacity={0.7}
+              >
+                {autoAsignando ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="flash" size={14} color="#fff" />
+                    <Text style={styles.btnAutoAsignarTexto}>Auto</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+              <View style={[styles.progresoBadge, { backgroundColor: '#fef2f2' }]}>
+                <Text style={[styles.progresoBadgeTexto, { color: Colors.error }]}>{totalSinAsignar}</Text>
+              </View>
             </View>
           </View>
           <Text style={styles.sinAsignarSub}>
-            Toca una transacción para asignarla a una obligación
+            Agrupadas por categoría. Toca una categoría para expandir.
           </Text>
 
-          {sinAsignar.slice(0, 10).map((mov) => (
-            <TouchableOpacity
-              key={mov._id}
-              style={styles.movItem}
-              onPress={() => handleAbrirAsignacion(mov)}
-              activeOpacity={0.7}
-            >
-              <View style={{ flex: 1 }}>
-                <Text style={styles.movDescripcion} numberOfLines={1}>
-                  {mov.description || 'Sin descripción'}
-                </Text>
-                <Text style={styles.movFecha}>
-                  {formatearFecha(mov.postDate)}
-                </Text>
-              </View>
-              <Text style={styles.movMonto}>{formatearMoneda(Math.abs(mov.amount))}</Text>
-              <Ionicons name="chevron-forward" size={18} color={Colors.textoSecundario} />
-            </TouchableOpacity>
-          ))}
+          {categoriasAgrupadas.map((cat) => (
+            <View key={cat.nombre} style={styles.catGroup}>
+              <TouchableOpacity
+                style={styles.catHeader}
+                onPress={() => setExpandedCat(expandedCat === cat.nombre ? null : cat.nombre)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.catIcono, { backgroundColor: cat.color + '20' }]}>
+                  <Ionicons name={cat.icono || 'ellipsis-horizontal'} size={18} color={cat.color} />
+                </View>
+                <View style={{ flex: 1, marginLeft: 10 }}>
+                  <Text style={styles.catNombre}>{cat.nombre}</Text>
+                  <Text style={styles.catDetalle}>{cat.cantidad} transaccion{cat.cantidad !== 1 ? 'es' : ''}</Text>
+                </View>
+                <Text style={styles.catTotal}>{formatearMoneda(cat.total)}</Text>
+                {cat.obligacionesSugeridas?.length === 1 && (
+                  <View style={styles.catSugerencia}>
+                    <Ionicons name="link" size={12} color={Colors.primario} />
+                  </View>
+                )}
+                <Ionicons
+                  name={expandedCat === cat.nombre ? 'chevron-up' : 'chevron-down'}
+                  size={18} color={Colors.textoSecundario}
+                />
+              </TouchableOpacity>
 
-          {sinAsignar.length > 10 && (
-            <Text style={styles.emptyText}>y {sinAsignar.length - 10} más...</Text>
-          )}
+              {expandedCat === cat.nombre && (
+                <View style={styles.catExpanded}>
+                  {cat.obligacionesSugeridas?.length > 0 && (
+                    <View style={styles.sugerenciaBox}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.sugerenciaLabel}>Sugerencia:</Text>
+                        {cat.obligacionesSugeridas.map(ob => (
+                          <Text key={ob._id} style={styles.sugerenciaNombre}>
+                            {ob.nombre} ({formatearMoneda(ob.monto)}/mes)
+                          </Text>
+                        ))}
+                      </View>
+                      {cat.obligacionesSugeridas.length === 1 && (
+                        <TouchableOpacity
+                          style={styles.btnAsignarTodos}
+                          onPress={() => handleAsignarTodosCategoria(cat)}
+                          disabled={asignando}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={styles.btnAsignarTodosTexto}>
+                            {asignando ? '...' : 'Asignar todos'}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )}
+
+                  {cat.movimientos.map((mov) => (
+                    <TouchableOpacity
+                      key={mov._id}
+                      style={styles.movItem}
+                      onPress={() => handleAbrirAsignacion(mov)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.movDescripcion} numberOfLines={1}>
+                          {mov.description || 'Sin descripción'}
+                        </Text>
+                        <Text style={styles.movFecha}>
+                          {formatearFecha(mov.postDate)}
+                        </Text>
+                      </View>
+                      <Text style={styles.movMonto}>{formatearMoneda(Math.abs(mov.amount))}</Text>
+                      <Ionicons name="chevron-forward" size={18} color={Colors.textoSecundario} />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+          ))}
         </View>
       )}
 
@@ -390,6 +513,77 @@ export default function Dashboard() {
           </View>
         </View>
       </Modal>
+      {/* ====== MODAL AUTO-ASIGNAR PREVIEW ====== */}
+      <Modal
+        visible={modalAutoAsignar}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setModalAutoAsignar(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitulo}>Auto-asignar</Text>
+              <TouchableOpacity onPress={() => setModalAutoAsignar(false)}>
+                <Ionicons name="close" size={24} color={Colors.texto} />
+              </TouchableOpacity>
+            </View>
+
+            {previewAutoAsignar && (
+              <View>
+                <View style={styles.previewResumen}>
+                  <View style={styles.previewItem}>
+                    <Ionicons name="checkmark-circle" size={20} color={Colors.exito} />
+                    <Text style={styles.previewNum}>{previewAutoAsignar.asignables}</Text>
+                    <Text style={styles.previewLabel}>asignables</Text>
+                  </View>
+                  <View style={styles.previewItem}>
+                    <Ionicons name="help-circle" size={20} color={Colors.advertencia} />
+                    <Text style={styles.previewNum}>{previewAutoAsignar.requierenRevision?.length || 0}</Text>
+                    <Text style={styles.previewLabel}>revisión manual</Text>
+                  </View>
+                </View>
+
+                {previewAutoAsignar.asignaciones?.length > 0 && (
+                  <View style={{ marginTop: 12 }}>
+                    <Text style={styles.modalSubtitulo}>Se asignarán:</Text>
+                    <ScrollView style={{ maxHeight: 200 }}>
+                      {previewAutoAsignar.asignaciones.map((a) => (
+                        <View key={a.movimientoId} style={styles.previewRow}>
+                          <Text style={styles.previewDesc} numberOfLines={1}>{a.description}</Text>
+                          <Ionicons name="arrow-forward" size={14} color={Colors.textoSecundario} />
+                          <Text style={styles.previewOblig} numberOfLines={1}>{a.obligacion.nombre}</Text>
+                        </View>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+
+                {previewAutoAsignar.asignables > 0 && (
+                  <TouchableOpacity
+                    style={styles.btnConfirmarAuto}
+                    onPress={handleAutoAsignarConfirmar}
+                    disabled={autoAsignando}
+                    activeOpacity={0.7}
+                  >
+                    {autoAsignando ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Text style={styles.btnConfirmarAutoTexto}>
+                        Confirmar ({previewAutoAsignar.asignables} movimientos)
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                )}
+
+                {previewAutoAsignar.asignables === 0 && (
+                  <Text style={styles.emptyText}>No se encontraron asignaciones automáticas posibles</Text>
+                )}
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -407,7 +601,7 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#fff', borderRadius: BorderRadius.lg, marginHorizontal: Spacing.lg,
     marginTop: Spacing.sm, padding: Spacing.md,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.06)', elevation: 3,
   },
   cardTitulo: { fontSize: FontSize.md, fontWeight: '700', color: Colors.texto, marginBottom: 8 },
   saludContainer: { alignItems: 'center', justifyContent: 'center', position: 'relative' },
@@ -420,7 +614,7 @@ const styles = StyleSheet.create({
   gridItem: {
     backgroundColor: '#fff', borderRadius: BorderRadius.md, paddingVertical: 10, paddingHorizontal: 8,
     alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
+    boxShadow: '0px 1px 4px rgba(0, 0, 0, 0.05)', elevation: 2,
   },
   gridLabel: { fontSize: 10, color: Colors.textoSecundario, marginTop: 4, textAlign: 'center' },
   gridValor: { fontSize: FontSize.sm, fontWeight: '700', color: Colors.texto, marginTop: 2, textAlign: 'center' },
@@ -468,6 +662,65 @@ const styles = StyleSheet.create({
   movFecha: { fontSize: FontSize.xs, color: Colors.textoSecundario, marginTop: 2 },
   movMonto: { fontSize: FontSize.sm, fontWeight: '700', color: Colors.error, marginRight: 6 },
   emptyText: { fontSize: FontSize.sm, color: Colors.textoSecundario, textAlign: 'center', paddingVertical: 16 },
+
+  // --- Categorías agrupadas ---
+  catGroup: {
+    borderBottomWidth: 1, borderBottomColor: Colors.borde,
+  },
+  catHeader: {
+    flexDirection: 'row', alignItems: 'center', paddingVertical: 12,
+  },
+  catIcono: {
+    width: 36, height: 36, borderRadius: 18,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  catNombre: { fontSize: FontSize.sm, fontWeight: '700', color: Colors.texto },
+  catDetalle: { fontSize: FontSize.xs, color: Colors.textoSecundario, marginTop: 1 },
+  catTotal: { fontSize: FontSize.sm, fontWeight: '700', color: Colors.error, marginRight: 6 },
+  catSugerencia: {
+    backgroundColor: '#eef2ff', borderRadius: 10, padding: 4, marginRight: 4,
+  },
+  catExpanded: {
+    paddingLeft: 46, paddingBottom: 8,
+  },
+  sugerenciaBox: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#f0f9ff',
+    borderRadius: BorderRadius.md, padding: 10, marginBottom: 8,
+  },
+  sugerenciaLabel: { fontSize: FontSize.xs, color: Colors.textoSecundario },
+  sugerenciaNombre: { fontSize: FontSize.xs, fontWeight: '600', color: Colors.primario },
+  btnAsignarTodos: {
+    backgroundColor: Colors.primario, borderRadius: BorderRadius.md,
+    paddingHorizontal: 12, paddingVertical: 6, marginLeft: 8,
+  },
+  btnAsignarTodosTexto: { color: '#fff', fontSize: FontSize.xs, fontWeight: '700' },
+  btnAutoAsignar: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: Colors.primario, borderRadius: BorderRadius.full,
+    paddingHorizontal: 10, paddingVertical: 5,
+  },
+  btnAutoAsignarTexto: { color: '#fff', fontSize: FontSize.xs, fontWeight: '700' },
+
+  // --- Modal auto-asignar ---
+  previewResumen: {
+    flexDirection: 'row', justifyContent: 'space-around',
+    backgroundColor: Colors.fondo, borderRadius: BorderRadius.md,
+    padding: Spacing.md, marginBottom: 12,
+  },
+  previewItem: { alignItems: 'center', gap: 4 },
+  previewNum: { fontSize: FontSize.xl, fontWeight: '800', color: Colors.texto },
+  previewLabel: { fontSize: FontSize.xs, color: Colors.textoSecundario },
+  previewRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: Colors.borde,
+  },
+  previewDesc: { flex: 1, fontSize: FontSize.xs, color: Colors.texto },
+  previewOblig: { flex: 1, fontSize: FontSize.xs, fontWeight: '600', color: Colors.primario },
+  btnConfirmarAuto: {
+    backgroundColor: Colors.exito, borderRadius: BorderRadius.md,
+    padding: Spacing.md, alignItems: 'center', marginTop: 16,
+  },
+  btnConfirmarAutoTexto: { color: '#fff', fontSize: FontSize.md, fontWeight: '700' },
 
   // --- Modal de asignación ---
   modalOverlay: {

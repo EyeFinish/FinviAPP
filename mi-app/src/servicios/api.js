@@ -233,6 +233,17 @@ export const obtenerMovimientosSinAsignar = async (mes) => {
   return response.data;
 };
 
+export const obtenerSinAsignarAgrupados = async (mes) => {
+  const params = mes ? { mes } : {};
+  const response = await api.get('/movimientos/sin-asignar-agrupados', { params });
+  return response.data;
+};
+
+export const autoAsignarMovimientos = async (mes, modo) => {
+  const response = await api.post('/movimientos/auto-asignar', { mes, modo });
+  return response.data;
+};
+
 export const asignarMovimiento = async (id, tipo, referenciaId) => {
   const response = await api.put(`/movimientos/${id}/asignar`, { tipo, referenciaId });
   return response.data;

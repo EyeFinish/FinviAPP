@@ -70,11 +70,18 @@ function CompletarCredito({ credito, onCompletado, onCancelar }) {
           requiereCompletar: false,
         });
       } else {
-        await actualizarCredito(credito._id, {
+        const inicio = new Date(datos.fechaInicio);
+      const hoy = new Date();
+      const mesesTranscurridos = Math.max(
+        0,
+        (hoy.getFullYear() - inicio.getFullYear()) * 12 + (hoy.getMonth() - inicio.getMonth())
+      );
+      const cuotasPagadas = Math.min(mesesTranscurridos, Number(datos.cuotasTotales));
+      await actualizarCredito(credito._id, {
           tasaInteres: Number(datos.tasaInteres) || 0,
           cuotaMensual: calculados.cuotaMensual,
           cuotasTotales: Number(datos.cuotasTotales),
-          cuotasPagadas: 0,
+          cuotasPagadas,
           fechaInicio: datos.fechaInicio,
           requiereCompletar: false,
         });

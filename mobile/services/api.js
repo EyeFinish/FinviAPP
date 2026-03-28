@@ -1,14 +1,39 @@
 import axios from 'axios';
+import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 import { getItem, deleteItem } from '../utils/storage';
 
-// Para dispositivo físico en la misma red WiFi:
-const API_URL = 'http://192.168.0.10:5000/api';
+// Detectar IP automáticamente (funciona en cualquier red y plataforma)
+const getApiUrl = () => {
+  if (Platform.OS === 'web') {
+    // En web, usar el hostname del navegador (funciona desde PC y desde celular)
+    const host = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+    return `http://${host}:5000/api`;
+  }
+
+  // Nativo: detectar IP desde Expo
+  const hostUri = Constants.expoConfig?.hostUri
+    || Constants.manifest?.debuggerHost
+    || Constants.manifest2?.extra?.expoGo?.debuggerHost
+    || Constants.manifest?.hostUri;
+  const ip = hostUri?.split(':')[0];
+
+  console.log('[API] hostUri:', hostUri, '→ IP:', ip);
+
+  return ip ? `http://${ip}:5000/api` : 'http://localhost:5000/api';
+};
+
+const API_URL = getApiUrl();
 
 const api = axios.create({
   baseURL: API_URL,
   timeout: 15000,
   headers: { 'Content-Type': 'application/json' },
 });
+
+// Callback para notificar al AuthContext cuando hay 401
+let _onUnauthorized = null;
+export const setOnUnauthorized = (cb) => { _onUnauthorized = cb; };
 
 // Interceptor: agregar JWT a cada request
 api.interceptors.request.use(async (config) => {
@@ -26,6 +51,7 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       await deleteItem('finvi_token');
       await deleteItem('finvi_user');
+      if (_onUnauthorized) _onUnauthorized();
     }
     return Promise.reject(error);
   }
@@ -64,6 +90,8 @@ export const obtenerProgresoMensual = (mes) => api.get('/obligaciones/progreso-m
 
 // ============ MOVIMIENTOS (ASIGNACIÓN) ============
 export const obtenerMovimientosSinAsignar = (mes) => api.get('/movimientos/sin-asignar', { params: mes ? { mes } : {} });
+export const obtenerSinAsignarAgrupados = (mes) => api.get('/movimientos/sin-asignar-agrupados', { params: mes ? { mes } : {} });
+export const autoAsignarMovimientos = (mes, modo) => api.post('/movimientos/auto-asignar', { mes, modo });
 export const asignarMovimiento = (id, tipo, referenciaId) => api.put(`/movimientos/${id}/asignar`, { tipo, referenciaId });
 export const desasignarMovimiento = (id) => api.put(`/movimientos/${id}/desasignar`);
 
@@ -73,7 +101,7 @@ export const obtenerCategoriasDisponibles = () => api.get('/estado/categorias');
 export const categorizarMovimiento = (descripcion, categoria) => api.post('/estado/categorizar', { descripcion, categoria });
 
 // ============ NOTIFICACIONES ============
-export const registrarPushToken = (token) => api.post('/notifications/register-token', { token });
+export const registrarTokenPush = (token, platform) => api.post('/notifications/register-token', { token, platform });
 export const obtenerNotificaciones = () => api.get('/notifications');
 export const marcarNotificacionLeida = (id) => api.put(`/notifications/${id}/read`);
 

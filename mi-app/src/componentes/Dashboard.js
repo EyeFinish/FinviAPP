@@ -2,10 +2,14 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
   obtenerCuentas, refrescarDatos, obtenerResumenCreditos, obtenerConexiones, eliminarConexion,
-  obtenerProgresoMensual, obtenerMovimientosSinAsignar, asignarMovimiento, desasignarMovimiento,
-  obtenerCostosFijos, obtenerDeudas,
+  obtenerProgresoMensual, obtenerSinAsignarAgrupados, asignarMovimiento, desasignarMovimiento,
+  autoAsignarMovimientos, obtenerCostosFijos, obtenerDeudas,
 } from '../servicios/api';
-import { Building2, Link2, RefreshCw, Loader, AlertTriangle } from 'lucide-react';
+import {
+  Building2, Link2, RefreshCw, Loader, AlertTriangle, ChevronDown, ChevronUp, Zap, LinkIcon,
+  ShoppingCart, Bike, Car, Utensils, Repeat, Wifi, Heart, Home, GraduationCap,
+  ShieldCheck, ShoppingBag, ArrowRightLeft, Banknote, MoreHorizontal, Satellite,
+} from 'lucide-react';
 import TarjetaCuenta from '../componentes/TarjetaCuenta';
 import TablaMovimientos from '../componentes/TablaMovimientos';
 import SaludFinanciera from '../componentes/SaludFinanciera';
@@ -14,6 +18,28 @@ import ObligacionFinanciera from '../componentes/ObligacionFinanciera';
 import { formatearMoneda, traducirTipoCuenta, calcularSaludFinanciera, obtenerInfoBanco, agruparCuentasPorBanco } from '../utilidades/formateadores';
 import '../estilos/dashboard.css';
 import '../estilos/compromisos.css';
+
+const ICON_MAP = {
+  'cart': ShoppingCart,
+  'bicycle': Bike,
+  'car': Car,
+  'restaurant': Utensils,
+  'refresh-circle': Repeat,
+  'wifi': Wifi,
+  'medkit': Heart,
+  'home': Home,
+  'school': GraduationCap,
+  'shield-checkmark': ShieldCheck,
+  'bag-handle': ShoppingBag,
+  'swap-horizontal': ArrowRightLeft,
+  'cash': Banknote,
+  'ellipsis-horizontal': MoreHorizontal,
+};
+
+const getCatIcono = (iconName, size = 18, color) => {
+  const Comp = ICON_MAP[iconName] || MoreHorizontal;
+  return <Comp size={size} color={color} />;
+};
 
 function Dashboard({ seccion = 'dashboard' }) {
   const [cuentas, setCuentas] = useState([]); 
@@ -30,10 +56,17 @@ function Dashboard({ seccion = 'dashboard' }) {
 
   // Estado para compromisos mensuales
   const [progreso, setProgreso] = useState(null);
-  const [sinAsignar, setSinAsignar] = useState([]);
+  const [categoriasAgrupadas, setCategoriasAgrupadas] = useState([]);
+  const [totalSinAsignar, setTotalSinAsignar] = useState(0);
   const [obligacionesLista, setObligacionesLista] = useState([]);
   const [seleccionAsignar, setSeleccionAsignar] = useState({}); // { movId: 'tipo_refId' }
   const [asignando, setAsignando] = useState(null); // movId being assigned
+  const [expandedCat, setExpandedCat] = useState(null);
+
+  // Auto-asignar
+  const [autoAsignando, setAutoAsignando] = useState(false);
+  const [modalAutoAsignar, setModalAutoAsignar] = useState(false);
+  const [previewAutoAsignar, setPreviewAutoAsignar] = useState(null);
 
   // Totales combinados (créditos + obligaciones)
   const [resumenOblig, setResumenOblig] = useState({ totalDeuda: 0, compromisoMensual: 0 });
@@ -81,14 +114,17 @@ function Dashboard({ seccion = 'dashboard' }) {
   const cargarCompromisos = useCallback(async () => {
     try {
       const mes = mesActual();
-      const [resProgreso, resSinAsignar, resCostos, resDeudas] = await Promise.all([
+      const [resProgreso, resAgrupados, resCostos, resDeudas] = await Promise.all([
         obtenerProgresoMensual(mes).catch(() => null),
-        obtenerMovimientosSinAsignar(mes).catch(() => []),
+        obtenerSinAsignarAgrupados(mes).catch(() => ({ categorias: [], totalMovimientos: 0 })),
         obtenerCostosFijos().catch(() => []),
         obtenerDeudas().catch(() => []),
       ]);
       setProgreso(resProgreso);
-      setSinAsignar(resSinAsignar || []);
+
+      const agrupados = resAgrupados || { categorias: [], totalMovimientos: 0 };
+      setCategoriasAgrupadas(agrupados.categorias || []);
+      setTotalSinAsignar(agrupados.totalMovimientos || 0);
 
       // Datos crudos de obligaciones
       const rawCostos = resCostos || [];
@@ -131,6 +167,7 @@ function Dashboard({ seccion = 'dashboard' }) {
       await refrescarDatos();
       await cargarCuentas();
       await cargarCreditos();
+      await cargarConexiones();
       await cargarCompromisos();
     } catch (err) {
       console.error('Error refrescando datos:', err);
@@ -177,6 +214,49 @@ function Dashboard({ seccion = 'dashboard' }) {
       await cargarCompromisos();
     } catch (err) {
       console.error('Error desasignando:', err);
+    }
+  };
+
+  const handleAutoAsignarPreview = async () => {
+    setAutoAsignando(true);
+    try {
+      const res = await autoAsignarMovimientos(mesActual(), 'preview');
+      setPreviewAutoAsignar(res);
+      setModalAutoAsignar(true);
+    } catch (err) {
+      console.error('Error preview auto-asignar:', err);
+    } finally {
+      setAutoAsignando(false);
+    }
+  };
+
+  const handleAutoAsignarConfirmar = async () => {
+    setAutoAsignando(true);
+    try {
+      await autoAsignarMovimientos(mesActual(), 'aplicar');
+      setModalAutoAsignar(false);
+      setPreviewAutoAsignar(null);
+      await cargarCompromisos();
+    } catch (err) {
+      console.error('Error auto-asignar:', err);
+    } finally {
+      setAutoAsignando(false);
+    }
+  };
+
+  const handleAsignarTodosCategoria = async (cat) => {
+    if (!cat.obligacionesSugeridas || cat.obligacionesSugeridas.length !== 1) return;
+    const oblig = cat.obligacionesSugeridas[0];
+    setAsignando('batch');
+    try {
+      for (const mov of cat.movimientos) {
+        await asignarMovimiento(mov._id, oblig.tipo, oblig._id);
+      }
+      await cargarCompromisos();
+    } catch (err) {
+      console.error('Error asignando categoría:', err);
+    } finally {
+      setAsignando(null);
     }
   };
 
@@ -391,72 +471,195 @@ function Dashboard({ seccion = 'dashboard' }) {
           </div>
         )}
 
-        {/* ====== TRANSACCIONES SIN ASIGNAR ====== */}
-        {sinAsignar.length > 0 && (
+        {/* ====== TRANSACCIONES SIN ASIGNAR (AGRUPADAS POR CATEGORÍA) ====== */}
+        {categoriasAgrupadas.length > 0 && (
           <div className="sin-asignar-seccion">
             <div className="compromisos-header">
               <h3 className="compromisos-titulo">Transacciones sin asignar</h3>
-              <span className="compromisos-badge alerta">{sinAsignar.length}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  className="btn-auto-asignar"
+                  onClick={handleAutoAsignarPreview}
+                  disabled={autoAsignando}
+                >
+                  <Zap size={14} />
+                  {autoAsignando ? 'Analizando...' : 'Auto-asignar'}
+                </button>
+                <span className="compromisos-badge alerta">{totalSinAsignar}</span>
+              </div>
             </div>
             <p className="sin-asignar-subtitulo">
-              Selecciona a qué obligación pertenece cada transacción para llevar el control de tus pagos.
+              Agrupadas por categoría. Haz clic en una categoría para expandir.
             </p>
-            <table className="sin-asignar-tabla">
-              <thead>
-                <tr>
-                  <th>Fecha</th>
-                  <th>Descripción</th>
-                  <th>Monto</th>
-                  <th>Asignar a</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sinAsignar.slice(0, 20).map((mov) => (
-                  <tr key={mov._id}>
-                    <td>{mov.postDate ? new Date(mov.postDate).toLocaleDateString('es-CL') : '-'}</td>
-                    <td>{mov.description || 'Sin descripción'}</td>
-                    <td className="sin-asignar-monto">{formatearMoneda(Math.abs(mov.amount))}</td>
-                    <td>
-                      <div className="td-asignar">
-                        <select
-                          className="select-obligacion"
-                          value={seleccionAsignar[mov._id] || ''}
-                          onChange={(e) => setSeleccionAsignar((prev) => ({ ...prev, [mov._id]: e.target.value }))}
-                        >
-                          <option value="">-- Seleccionar --</option>
-                          <optgroup label="Costos Fijos">
-                            {obligacionesLista.filter((o) => o.tipo === 'costoFijo').map((o) => (
-                              <option key={o._id} value={`costoFijo_${o._id}`}>
-                                {o.nombre} ({formatearMoneda(o.monto)})
-                              </option>
+
+            <div className="categorias-agrupadas">
+              {categoriasAgrupadas.map((cat) => (
+                <div key={cat.nombre} className="cat-group">
+                  <div
+                    className="cat-header"
+                    onClick={() => setExpandedCat(expandedCat === cat.nombre ? null : cat.nombre)}
+                  >
+                    <div className="cat-icono" style={{ backgroundColor: cat.color + '20' }}>
+                      {getCatIcono(cat.icono, 18, cat.color)}
+                    </div>
+                    <div className="cat-info">
+                      <span className="cat-nombre">{cat.nombre}</span>
+                      <span className="cat-detalle">{cat.cantidad} transaccion{cat.cantidad !== 1 ? 'es' : ''}</span>
+                    </div>
+                    <span className="cat-total">{formatearMoneda(cat.total)}</span>
+                    {cat.obligacionesSugeridas?.length > 0 && (
+                      <span className="cat-link-badge" title="Tiene sugerencia de asignación">
+                        <LinkIcon size={12} />
+                      </span>
+                    )}
+                    {expandedCat === cat.nombre ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                  </div>
+
+                  {expandedCat === cat.nombre && (
+                    <div className="cat-expanded">
+                      {cat.obligacionesSugeridas?.length > 0 && (
+                        <div className="sugerencia-box">
+                          <div className="sugerencia-info">
+                            <span className="sugerencia-label">Sugerencia:</span>
+                            {cat.obligacionesSugeridas.map(ob => (
+                              <span key={ob._id} className="sugerencia-nombre">
+                                {ob.nombre} ({formatearMoneda(ob.monto)}/mes)
+                              </span>
                             ))}
-                          </optgroup>
-                          <optgroup label="Deudas">
-                            {obligacionesLista.filter((o) => o.tipo === 'deuda').map((o) => (
-                              <option key={o._id} value={`deuda_${o._id}`}>
-                                {o.nombre} ({formatearMoneda(o.monto)})
-                              </option>
-                            ))}
-                          </optgroup>
-                        </select>
-                        <button
-                          className="btn-asignar"
-                          disabled={!seleccionAsignar[mov._id] || asignando === mov._id}
-                          onClick={() => handleAsignar(mov._id)}
-                        >
-                          {asignando === mov._id ? '...' : 'Asignar'}
-                        </button>
+                          </div>
+                          {cat.obligacionesSugeridas.length === 1 && (
+                            <button
+                              className="btn-asignar-todos"
+                              onClick={() => handleAsignarTodosCategoria(cat)}
+                              disabled={asignando === 'batch'}
+                            >
+                              {asignando === 'batch' ? '...' : 'Asignar todos'}
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                      <table className="sin-asignar-tabla">
+                        <thead>
+                          <tr>
+                            <th>Fecha</th>
+                            <th>Descripción</th>
+                            <th>Monto</th>
+                            <th>Asignar a</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {cat.movimientos.map((mov) => (
+                            <tr key={mov._id}>
+                              <td>{mov.postDate ? new Date(mov.postDate).toLocaleDateString('es-CL') : '-'}</td>
+                              <td>{mov.description || 'Sin descripción'}</td>
+                              <td className="sin-asignar-monto">{formatearMoneda(Math.abs(mov.amount))}</td>
+                              <td>
+                                <div className="td-asignar">
+                                  <select
+                                    className="select-obligacion"
+                                    value={seleccionAsignar[mov._id] || ''}
+                                    onChange={(e) => setSeleccionAsignar((prev) => ({ ...prev, [mov._id]: e.target.value }))}
+                                  >
+                                    <option value="">-- Seleccionar --</option>
+                                    {cat.obligacionesSugeridas?.length > 0 && (
+                                      <optgroup label="★ Sugeridas">
+                                        {cat.obligacionesSugeridas.map((o) => (
+                                          <option key={o._id} value={`${o.tipo}_${o._id}`}>
+                                            {o.nombre} ({formatearMoneda(o.monto)})
+                                          </option>
+                                        ))}
+                                      </optgroup>
+                                    )}
+                                    <optgroup label="Costos Fijos">
+                                      {obligacionesLista.filter((o) => o.tipo === 'costoFijo').map((o) => (
+                                        <option key={o._id} value={`costoFijo_${o._id}`}>
+                                          {o.nombre} ({formatearMoneda(o.monto)})
+                                        </option>
+                                      ))}
+                                    </optgroup>
+                                    <optgroup label="Deudas">
+                                      {obligacionesLista.filter((o) => o.tipo === 'deuda').map((o) => (
+                                        <option key={o._id} value={`deuda_${o._id}`}>
+                                          {o.nombre} ({formatearMoneda(o.monto)})
+                                        </option>
+                                      ))}
+                                    </optgroup>
+                                  </select>
+                                  <button
+                                    className="btn-asignar"
+                                    disabled={!seleccionAsignar[mov._id] || asignando === mov._id}
+                                    onClick={() => handleAsignar(mov._id)}
+                                  >
+                                    {asignando === mov._id ? '...' : 'Asignar'}
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ====== MODAL AUTO-ASIGNAR ====== */}
+        {modalAutoAsignar && (
+          <div className="modal-overlay" onClick={() => setModalAutoAsignar(false)}>
+            <div className="modal-auto-asignar" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-auto-header">
+                <h3>Auto-asignar transacciones</h3>
+                <button className="modal-close" onClick={() => setModalAutoAsignar(false)}>✕</button>
+              </div>
+
+              {previewAutoAsignar && (
+                <div>
+                  <div className="preview-resumen">
+                    <div className="preview-item exito">
+                      <span className="preview-num">{previewAutoAsignar.asignables}</span>
+                      <span className="preview-label">asignables automáticamente</span>
+                    </div>
+                    <div className="preview-item advertencia">
+                      <span className="preview-num">{previewAutoAsignar.requierenRevision?.length || 0}</span>
+                      <span className="preview-label">requieren revisión manual</span>
+                    </div>
+                  </div>
+
+                  {previewAutoAsignar.asignaciones?.length > 0 && (
+                    <div className="preview-detalle">
+                      <h4>Se asignarán:</h4>
+                      <div className="preview-lista">
+                        {previewAutoAsignar.asignaciones.map((a) => (
+                          <div key={a.movimientoId} className="preview-row">
+                            <span className="preview-desc">{a.description}</span>
+                            <span className="preview-arrow">→</span>
+                            <span className="preview-oblig">{a.obligacion.nombre}</span>
+                          </div>
+                        ))}
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {sinAsignar.length > 20 && (
-              <p style={{ textAlign: 'center', color: '#555a7e', fontSize: '13px', marginTop: '12px' }}>
-                y {sinAsignar.length - 20} transacciones más...
-              </p>
-            )}
+                    </div>
+                  )}
+
+                  {previewAutoAsignar.asignables > 0 ? (
+                    <button
+                      className="btn-confirmar-auto"
+                      onClick={handleAutoAsignarConfirmar}
+                      disabled={autoAsignando}
+                    >
+                      {autoAsignando ? 'Asignando...' : `Confirmar (${previewAutoAsignar.asignables} movimientos)`}
+                    </button>
+                  ) : (
+                    <p style={{ textAlign: 'center', color: '#555a7e', marginTop: '16px' }}>
+                      No se encontraron asignaciones automáticas posibles
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )}
 

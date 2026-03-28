@@ -17,7 +17,7 @@ function iniciarAlertaPagos() {
       tresDias.setDate(tresDias.getDate() + 3);
 
       const creditos = await Credit.find({
-        estado: 'al_dia',
+        estado: 'activo',
         fechaVencimiento: { $lte: tresDias, $gte: new Date() },
       });
 
@@ -90,7 +90,7 @@ function iniciarAlertaSalud() {
         if (deudaTotal === 0) puntaje += 15;
         else if (saldoTotal > deudaTotal) puntaje += 10;
         if (cuotasMensuales > 0 && saldoTotal > cuotasMensuales * 3) puntaje += 15;
-        const atrasados = creditos.filter(c => c.estado === 'atrasado').length;
+        const atrasados = creditos.filter(c => c.estado === 'moroso').length;
         puntaje -= atrasados * 10;
         puntaje = Math.max(0, Math.min(100, puntaje));
 

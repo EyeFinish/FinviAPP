@@ -201,6 +201,31 @@ export default function Configuracion() {
           ))}
         </View>
 
+        {/* CERRAR SESIÓN */}
+        <TouchableOpacity
+          style={styles.btnCerrarSesion}
+          onPress={() => {
+            Alert.alert(
+              'Cerrar sesión',
+              '¿Seguro que quieres cerrar la sesión?',
+              [
+                { text: 'Cancelar', style: 'cancel' },
+                {
+                  text: 'Cerrar sesión',
+                  style: 'destructive',
+                  onPress: async () => {
+                    await logout();
+                    router.replace('/(auth)/login');
+                  },
+                },
+              ]
+            );
+          }}
+        >
+          <Ionicons name="log-out-outline" size={18} color={Colors.primario} />
+          <Text style={styles.btnCerrarSesionTexto}>Cerrar sesión</Text>
+        </TouchableOpacity>
+
         {/* ZONA PELIGRO */}
         <View style={[styles.card, styles.cardPeligro]}>
           <View style={styles.cardHeader}>
@@ -234,7 +259,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.lg,
     padding: 22,
     marginBottom: 16,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 2,
+    boxShadow: '0px 1px 4px rgba(0, 0, 0, 0.04)', elevation: 2,
   },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 18 },
   cardTitulo: { fontSize: FontSize.md, fontWeight: '600', color: Colors.texto },
@@ -269,4 +294,12 @@ const styles = StyleSheet.create({
     paddingVertical: 11, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6,
   },
   btnPeligroTexto: { color: '#fff', fontWeight: '600', fontSize: FontSize.sm },
+
+  btnCerrarSesion: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: '#fff', borderRadius: BorderRadius.lg, padding: 16, marginBottom: 16,
+    borderWidth: 1.5, borderColor: Colors.primario,
+    boxShadow: '0px 1px 4px rgba(0, 0, 0, 0.04)', elevation: 2,
+  },
+  btnCerrarSesionTexto: { color: Colors.primario, fontWeight: '600', fontSize: FontSize.md },
 });

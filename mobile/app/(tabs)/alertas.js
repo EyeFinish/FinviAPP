@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff',
     borderRadius: BorderRadius.md, padding: Spacing.md, marginBottom: 10,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
+    boxShadow: '0px 1px 4px rgba(0, 0, 0, 0.05)', elevation: 2,
   },
   cardNoLeida: { backgroundColor: Colors.primario + '08' },
   iconCircle: {

@@ -162,7 +162,7 @@ const styles = StyleSheet.create({
   logoText: { fontSize: FontSize.title, fontWeight: '800', color: '#fff' },
   card: {
     backgroundColor: '#fff', borderRadius: BorderRadius.lg, padding: Spacing.lg,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 6,
+    boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.1)', elevation: 6,
   },
   titulo: { fontSize: FontSize.xl, fontWeight: '700', color: Colors.texto, textAlign: 'center', marginBottom: 20 },
   errorBox: {

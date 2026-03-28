@@ -399,7 +399,7 @@ const styles = StyleSheet.create({
   cuentaCard: {
     backgroundColor: '#fff', borderRadius: BorderRadius.md, padding: Spacing.md,
     marginBottom: 10, flexDirection: 'row', alignItems: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
+    boxShadow: '0px 1px 4px rgba(0, 0, 0, 0.05)', elevation: 2,
   },
   cuentaCardActiva: { borderWidth: 2, borderColor: Colors.primario },
   bancoIcon: {
