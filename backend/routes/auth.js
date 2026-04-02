@@ -23,7 +23,7 @@ router.post('/registro', async (req, res) => {
 
     res.status(201).json({
       token,
-      user: { id: user._id, nombre: user.nombre, email: user.email },
+      user: { id: user._id, nombre: user.nombre, email: user.email, suscripcion: user.suscripcion },
     });
   } catch (err) {
     if (err.name === 'ValidationError') {
@@ -52,7 +52,7 @@ router.post('/login', async (req, res) => {
 
     res.json({
       token,
-      user: { id: user._id, nombre: user.nombre, email: user.email },
+      user: { id: user._id, nombre: user.nombre, email: user.email, suscripcion: user.suscripcion },
     });
   } catch (err) {
     res.status(500).json({ message: 'Error al iniciar sesión' });
@@ -66,6 +66,7 @@ router.get('/me', auth, async (req, res) => {
     nombre: req.user.nombre,
     email: req.user.email,
     creadoEn: req.user.createdAt,
+    suscripcion: req.user.suscripcion,
   });
 });
 

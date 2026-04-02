@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { Platform } from 'react-native';
 import { getItem, setItem, deleteItem } from '../utils/storage';
-import { obtenerUsuarioActual, setOnUnauthorized } from '../services/api';
+import { obtenerUsuarioActual, obtenerEstadoSuscripcion, setOnUnauthorized } from '../services/api';
+import { inicializarPurchases } from '../services/purchases';
 
 const AuthContext = createContext(null);
 
@@ -24,6 +26,10 @@ export function AuthProvider({ children }) {
       }
       const res = await obtenerUsuarioActual();
       setUser(res.data);
+      // Inicializar RevenueCat SDK solo en nativo (no en web)
+      if (Platform.OS !== 'web') {
+        await inicializarPurchases(res.data.id);
+      }
     } catch {
       await deleteItem('finvi_token');
       await deleteItem('finvi_user');
@@ -41,6 +47,10 @@ export function AuthProvider({ children }) {
       // Si falla el storage, el login sigue funcionando en memoria
     }
     setUser(userData);
+    // Inicializar RevenueCat SDK solo en nativo
+    if (Platform.OS !== 'web') {
+      await inicializarPurchases(userData.id);
+    }
   };
 
   const logout = async () => {
@@ -64,8 +74,18 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // Refresca el estado de suscripción desde el backend y actualiza el contexto
+  const refrescarSuscripcion = async () => {
+    try {
+      const res = await obtenerEstadoSuscripcion();
+      await actualizarUsuario({ suscripcion: res.data });
+    } catch {
+      // Si falla, no interrumpir la experiencia del usuario
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, cargando, login, logout, actualizarUsuario }}>
+    <AuthContext.Provider value={{ user, cargando, login, logout, actualizarUsuario, refrescarSuscripcion }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../contextos/AuthContext';
-import { actualizarPerfil, cambiarPassword, eliminarCuenta } from '../servicios/api';
+import { actualizarPerfil, cambiarPassword, eliminarCuenta, obtenerEstadoSuscripcion } from '../servicios/api';
 import { useNavigate } from 'react-router-dom';
-import { User, Lock, Trash2, HelpCircle, ChevronDown, AlertTriangle, Check, X } from 'lucide-react';
+import { User, Lock, Trash2, HelpCircle, ChevronDown, AlertTriangle, Check, X, Star, Smartphone } from 'lucide-react';
 import '../estilos/configuracion.css';
 
 const FAQ = [
@@ -40,6 +40,15 @@ export default function Configuracion() {
 
   // FAQ
   const [faqAbierto, setFaqAbierto] = useState(null);
+
+  // Suscripción
+  const [suscripcion, setSuscripcion] = useState(null);
+
+  useEffect(() => {
+    obtenerEstadoSuscripcion()
+      .then(setSuscripcion)
+      .catch(() => {});
+  }, []);
 
   const guardarPerfil = async () => {
     setPerfilMsg(null);
@@ -149,6 +158,66 @@ export default function Configuracion() {
         <button className="config-btn config-btn-primario" onClick={handleCambiarPassword} disabled={guardandoPassword}>
           {guardandoPassword ? 'Cambiando...' : 'Cambiar contraseña'}
         </button>
+      </div>
+
+      {/* SUSCRIPCIÓN */}
+      <div className="config-card">
+        <h2 className="config-card-titulo">
+          <Star size={18} style={{ color: suscripcion?.estado === 'activo' ? '#10b981' : suscripcion?.estado === 'trial' ? '#f59e0b' : '#1800ad' }} />
+          Suscripción
+        </h2>
+
+        {!suscripcion || suscripcion.estado === 'sin_suscripcion' ? (
+          <div className="config-sub-cta">
+            <p className="config-sub-plan-nombre">Plan Básico</p>
+            <p className="config-sub-precio">$6.990 CLP/mes · Acceso completo a Finvi</p>
+            <div className="config-sub-aviso">
+              <Smartphone size={16} />
+              <span>Para suscribirte, descarga la app móvil de Finvi en App Store o Google Play.</span>
+            </div>
+          </div>
+        ) : (
+          <div>
+            {suscripcion.estado === 'trial' && (
+              <span className="config-sub-badge config-sub-badge-trial">PRUEBA GRATUITA</span>
+            )}
+            {suscripcion.estado === 'activo' && (
+              <span className="config-sub-badge config-sub-badge-activo">ACTIVO</span>
+            )}
+            {(suscripcion.estado === 'cancelado' || suscripcion.estado === 'vencido') && (
+              <span className="config-sub-badge config-sub-badge-vencido">
+                {suscripcion.estado === 'cancelado' ? 'CANCELADO' : 'VENCIDO'}
+              </span>
+            )}
+
+            <p className="config-sub-plan-nombre">Plan Básico</p>
+
+            {suscripcion.estado === 'activo' && (
+              <p className="config-sub-precio">$6.990 CLP/mes</p>
+            )}
+
+            {suscripcion.fechaRenovacion && (suscripcion.estado === 'activo' || suscripcion.estado === 'trial') && (
+              <div className="config-sub-fila">
+                <span className="config-sub-fila-label">
+                  {suscripcion.estado === 'trial' ? 'Próximo cobro' : 'Próxima renovación'}
+                </span>
+                <span className="config-sub-fila-valor">{formatearFecha(suscripcion.fechaRenovacion)}</span>
+              </div>
+            )}
+
+            {suscripcion.estado === 'cancelado' && suscripcion.fechaExpiracion && (
+              <div className="config-sub-fila">
+                <span className="config-sub-fila-label">Acceso hasta</span>
+                <span className="config-sub-fila-valor">{formatearFecha(suscripcion.fechaExpiracion)}</span>
+              </div>
+            )}
+
+            <div className="config-sub-aviso">
+              <Smartphone size={16} />
+              <span>Para gestionar o cancelar tu suscripción, usa la app móvil de Finvi.</span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* AYUDA */}

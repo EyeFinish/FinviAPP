@@ -60,8 +60,13 @@ export const obtenerCuentas = async () => {
   return response.data;
 };
 
-export const obtenerMovimientos = async (accountId) => {
-  const response = await api.get(`/fintoc/accounts/${accountId}/movements`);
+export const obtenerMovimientos = async (accountId, page = 1, limit = 100) => {
+  const response = await api.get(`/fintoc/accounts/${accountId}/movements`, { params: { page, limit } });
+  return response.data; // { movements, pagination }
+};
+
+export const obtenerSyncStatus = async () => {
+  const response = await api.get('/fintoc/sync-status');
   return response.data;
 };
 
@@ -284,6 +289,12 @@ export const cambiarPassword = async (datos) => {
 
 export const eliminarCuenta = async (password) => {
   const response = await api.delete('/auth/cuenta', { data: { password } });
+  return response.data;
+};
+
+// ─── Suscripción ──────────────────────────────────────────────────────────────
+export const obtenerEstadoSuscripcion = async () => {
+  const response = await api.get('/suscripcion/estado');
   return response.data;
 };
 

@@ -12,11 +12,17 @@ const app = express();
 // Middlewares
 app.use(cors());
 app.use(morgan('dev'));
+
+// Webhook de RevenueCat — debe registrarse ANTES de express.json()
+// ya que usa express.raw para verificar el body crudo
+app.use('/api/webhooks', require('./routes/webhooks'));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Rutas
 app.use('/api/auth', require('./routes/auth'));
+app.use('/api/suscripcion', require('./routes/suscripcion'));
 app.use('/api/fintoc', require('./routes/fintoc'));
 app.use('/api/creditos', require('./routes/creditos'));
 app.use('/api/estado', require('./routes/estado'));
@@ -66,4 +72,8 @@ app.listen(PORT, '0.0.0.0', () => {
   // Iniciar scheduler de alertas
   const { iniciarScheduler } = require('./services/alertScheduler');
   iniciarScheduler();
+
+  // Iniciar scheduler de sincronización automática (cada hora)
+  const { iniciarSyncScheduler } = require('./services/syncScheduler');
+  iniciarSyncScheduler();
 });

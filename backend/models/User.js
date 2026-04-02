@@ -21,6 +21,21 @@ const userSchema = new mongoose.Schema({
     minlength: [6, 'La contraseña debe tener al menos 6 caracteres'],
     select: false,
   },
+  suscripcion: {
+    estado: {
+      type: String,
+      enum: ['trial', 'activo', 'cancelado', 'vencido', 'sin_suscripcion'],
+      default: 'sin_suscripcion',
+    },
+    revenuecatId:    { type: String, default: null },
+    productoId:      { type: String, default: null },
+    plataforma:      { type: String, enum: ['ios', 'android', null], default: null },
+    inicioTrial:     { type: Date, default: null },
+    finTrial:        { type: Date, default: null },
+    fechaRenovacion: { type: Date, default: null },
+    fechaCancelacion:{ type: Date, default: null },
+    fechaExpiracion: { type: Date, default: null },
+  },
 }, { timestamps: true });
 
 userSchema.pre('save', async function () {

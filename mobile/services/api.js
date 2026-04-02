@@ -70,6 +70,7 @@ export const obtenerMovimientos = (accountId) => api.get(`/fintoc/accounts/${acc
 export const obtenerConexiones = () => api.get('/fintoc/links');
 export const refrescarDatos = () => api.post('/fintoc/refresh');
 export const resincronizarDatos = () => api.post('/fintoc/resync');
+export const obtenerSyncStatus = () => api.get('/fintoc/sync-status');
 
 // ============ OBLIGACIONES FINANCIERAS ============
 export const obtenerResumenObligaciones = () => api.get('/obligaciones/resumen');
@@ -109,5 +110,9 @@ export const marcarNotificacionLeida = (id) => api.put(`/notifications/${id}/rea
 export const actualizarPerfil = (datos) => api.put('/auth/perfil', datos);
 export const cambiarPassword = (datos) => api.put('/auth/password', datos);
 export const eliminarCuentaAPI = (password) => api.delete('/auth/cuenta', { data: { password } });
+
+// ============ SUSCRIPCIÓN ============
+export const obtenerEstadoSuscripcion = () => api.get('/suscripcion/estado');
+export const vincularRevenueCat = (revenuecatId) => api.post('/suscripcion/vincular', { revenuecatId });
 
 export default api;

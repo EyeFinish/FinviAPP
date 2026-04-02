@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity,
   Alert, ActivityIndicator, KeyboardAvoidingView, Platform,
@@ -6,7 +6,9 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
+import ConfirmModal from '../components/ConfirmModal';
 import { actualizarPerfil, cambiarPassword, eliminarCuentaAPI } from '../services/api';
+import { obtenerOferta, obtenerEstadoRC, suscribirse, restaurarCompras, abrirGestionSuscripcion } from '../services/purchases';
 import { Colors, Spacing, FontSize, BorderRadius } from '../constants/theme';
 
 const FAQ = [
@@ -18,7 +20,7 @@ const FAQ = [
 ];
 
 export default function Configuracion() {
-  const { user, logout, actualizarUsuario } = useAuth();
+  const { user, logout, actualizarUsuario, refrescarSuscripcion } = useAuth();
   const router = useRouter();
 
   const [nombre, setNombre] = useState(user?.nombre || '');
@@ -33,6 +35,67 @@ export default function Configuracion() {
   const [guardandoPassword, setGuardandoPassword] = useState(false);
 
   const [faqAbierto, setFaqAbierto] = useState(null);
+  const [modalLogout, setModalLogout] = useState(false);
+
+  // Estado de suscripción
+  const [estadoRC, setEstadoRC] = useState(null);
+  const [oferta, setOferta] = useState(null);
+  const [cargandoSub, setCargandoSub] = useState(false);
+  const [modalCancelar, setModalCancelar] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') {
+      cargarSuscripcion();
+    }
+  }, []);
+
+  const cargarSuscripcion = async () => {
+    const [estado, ofertaData] = await Promise.all([obtenerEstadoRC(), obtenerOferta()]);
+    setEstadoRC(estado);
+    setOferta(ofertaData);
+  };
+
+  const handleSuscribirse = async () => {
+    if (!oferta?.availablePackages?.length) return;
+    setCargandoSub(true);
+    try {
+      const paquete = oferta.availablePackages[0];
+      await suscribirse(paquete);
+      await cargarSuscripcion();
+      await refrescarSuscripcion();
+    } catch (err) {
+      if (!err.userCancelled) {
+        Alert.alert('Error', 'No se pudo completar la suscripción. Inténtalo de nuevo.');
+      }
+    } finally {
+      setCargandoSub(false);
+    }
+  };
+
+  const handleRestaurar = async () => {
+    setCargandoSub(true);
+    try {
+      await restaurarCompras();
+      await cargarSuscripcion();
+      await refrescarSuscripcion();
+      Alert.alert('Listo', 'Compras restauradas correctamente.');
+    } catch {
+      Alert.alert('Error', 'No se pudieron restaurar las compras.');
+    } finally {
+      setCargandoSub(false);
+    }
+  };
+
+  const diasRestantesTrial = () => {
+    if (!user?.suscripcion?.finTrial) return 0;
+    const diff = new Date(user.suscripcion.finTrial) - new Date();
+    return Math.max(0, Math.ceil(diff / 86400000));
+  };
+
+  const formatFecha = (d) =>
+    d ? new Date(d).toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
+
+  const estadoSub = user?.suscripcion?.estado || 'sin_suscripcion';
 
   const guardarPerfil = async () => {
     setPerfilMsg(null);
@@ -129,7 +192,143 @@ export default function Configuracion() {
     );
   };
 
+  // ── Tarjeta de suscripción ──────────────────────────────────────────────────
+  const renderTarjetaSuscripcion = () => {
+    if (Platform.OS === 'web') return null;
+
+    return (
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Ionicons
+            name="star"
+            size={18}
+            color={
+              estadoSub === 'activo' ? Colors.exito :
+              estadoSub === 'trial'  ? Colors.advertencia :
+              estadoSub === 'cancelado' || estadoSub === 'vencido' ? '#9ca3af' :
+              Colors.primario
+            }
+          />
+          <Text style={styles.cardTitulo}>Suscripción</Text>
+        </View>
+
+        {/* Sin suscripción */}
+        {estadoSub === 'sin_suscripcion' && (
+          <View>
+            <Text style={styles.subPlanNombre}>Plan Básico</Text>
+            <Text style={styles.subPrecio}>$6.990 CLP/mes · Acceso completo a Finvi</Text>
+            <TouchableOpacity
+              style={styles.btnPrimario}
+              onPress={handleSuscribirse}
+              disabled={cargandoSub}
+            >
+              {cargandoSub
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Text style={styles.btnPrimarioTexto}>Comenzar prueba gratis · 15 días</Text>
+              }
+            </TouchableOpacity>
+            <Text style={styles.subLegal}>Luego $6.990 CLP/mes. Cancela cuando quieras.</Text>
+            <TouchableOpacity style={styles.btnRestaurar} onPress={handleRestaurar}>
+              <Text style={styles.btnRestaurarTexto}>Restaurar compra anterior</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* En periodo de prueba */}
+        {estadoSub === 'trial' && (
+          <View>
+            <View style={[styles.subBadge, styles.subBadgeTrial]}>
+              <Ionicons name="time-outline" size={12} color="#b45309" />
+              <Text style={[styles.subBadgeTexto, { color: '#b45309' }]}>PRUEBA GRATUITA</Text>
+            </View>
+            <Text style={styles.subDiasRestantes}>{diasRestantesTrial()}</Text>
+            <Text style={styles.subDiasLabel}>días restantes de prueba</Text>
+            <Text style={styles.subPlanNombre}>Plan Básico</Text>
+            <View style={styles.subFila}>
+              <Text style={styles.subFilaLabel}>Próximo cobro</Text>
+              <Text style={styles.subFilaValor}>{formatFecha(user?.suscripcion?.fechaRenovacion)}</Text>
+            </View>
+            <View style={styles.subFila}>
+              <Text style={styles.subFilaLabel}>Precio</Text>
+              <Text style={styles.subFilaValor}>$6.990 CLP/mes</Text>
+            </View>
+            <TouchableOpacity style={styles.btnGestionar} onPress={abrirGestionSuscripcion}>
+              <Text style={styles.btnGestionarTexto}>Gestionar suscripción</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.btnCancelarSub} onPress={() => setModalCancelar(true)}>
+              <Text style={styles.btnCancelarSubTexto}>Cancelar suscripción</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Suscripción activa */}
+        {estadoSub === 'activo' && (
+          <View>
+            <View style={[styles.subBadge, styles.subBadgeActivo]}>
+              <Ionicons name="checkmark-circle" size={12} color="#065f46" />
+              <Text style={[styles.subBadgeTexto, { color: '#065f46' }]}>ACTIVO</Text>
+            </View>
+            <Text style={styles.subPlanNombre}>Plan Básico</Text>
+            <Text style={styles.subPrecio}>$6.990 CLP/mes</Text>
+            <View style={styles.subFila}>
+              <Text style={styles.subFilaLabel}>Próxima renovación</Text>
+              <Text style={styles.subFilaValor}>{formatFecha(user?.suscripcion?.fechaRenovacion)}</Text>
+            </View>
+            <TouchableOpacity style={styles.btnGestionar} onPress={abrirGestionSuscripcion}>
+              <Text style={styles.btnGestionarTexto}>Gestionar suscripción</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.btnCancelarSub} onPress={() => setModalCancelar(true)}>
+              <Text style={styles.btnCancelarSubTexto}>Cancelar suscripción</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Cancelada */}
+        {estadoSub === 'cancelado' && (
+          <View>
+            <View style={[styles.subBadge, styles.subBadgeVencido]}>
+              <Ionicons name="close-circle-outline" size={12} color="#6b7280" />
+              <Text style={[styles.subBadgeTexto, { color: '#6b7280' }]}>CANCELADO</Text>
+            </View>
+            <Text style={styles.subPlanNombre}>Plan Básico</Text>
+            {user?.suscripcion?.fechaExpiracion && new Date(user.suscripcion.fechaExpiracion) > new Date() && (
+              <View style={styles.subFila}>
+                <Text style={styles.subFilaLabel}>Acceso hasta</Text>
+                <Text style={styles.subFilaValor}>{formatFecha(user.suscripcion.fechaExpiracion)}</Text>
+              </View>
+            )}
+            <TouchableOpacity style={styles.btnPrimario} onPress={handleSuscribirse} disabled={cargandoSub}>
+              {cargandoSub
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Text style={styles.btnPrimarioTexto}>Reactivar suscripción</Text>
+              }
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Vencida */}
+        {estadoSub === 'vencido' && (
+          <View>
+            <View style={[styles.subBadge, styles.subBadgeVencido]}>
+              <Ionicons name="alert-circle-outline" size={12} color="#6b7280" />
+              <Text style={[styles.subBadgeTexto, { color: '#6b7280' }]}>VENCIDO</Text>
+            </View>
+            <Text style={styles.subPlanNombre}>Plan Básico</Text>
+            <Text style={styles.subPrecio}>Tu suscripción ha vencido</Text>
+            <TouchableOpacity style={styles.btnPrimario} onPress={handleSuscribirse} disabled={cargandoSub}>
+              {cargandoSub
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Text style={styles.btnPrimarioTexto}>Reactivar suscripción</Text>
+              }
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+    );
+  };
+
   return (
+    <>
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         {/* Header */}
@@ -184,6 +383,9 @@ export default function Configuracion() {
           </TouchableOpacity>
         </View>
 
+        {/* SUSCRIPCIÓN */}
+        {renderTarjetaSuscripcion()}
+
         {/* AYUDA */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
@@ -204,23 +406,7 @@ export default function Configuracion() {
         {/* CERRAR SESIÓN */}
         <TouchableOpacity
           style={styles.btnCerrarSesion}
-          onPress={() => {
-            Alert.alert(
-              'Cerrar sesión',
-              '¿Seguro que quieres cerrar la sesión?',
-              [
-                { text: 'Cancelar', style: 'cancel' },
-                {
-                  text: 'Cerrar sesión',
-                  style: 'destructive',
-                  onPress: async () => {
-                    await logout();
-                    router.replace('/(auth)/login');
-                  },
-                },
-              ]
-            );
-          }}
+          onPress={() => setModalLogout(true)}
         >
           <Ionicons name="log-out-outline" size={18} color={Colors.primario} />
           <Text style={styles.btnCerrarSesionTexto}>Cerrar sesión</Text>
@@ -244,6 +430,40 @@ export default function Configuracion() {
         <View style={{ height: 40 }} />
       </ScrollView>
     </KeyboardAvoidingView>
+
+    {/* Modal cerrar sesión */}
+    <ConfirmModal
+      visible={modalLogout}
+      icono="log-out-outline"
+      titulo="Cerrar sesión"
+      mensaje="¿Seguro que quieres cerrar la sesión?"
+      textoCancelar="Cancelar"
+      textoConfirmar="Cerrar sesión"
+      peligroso
+      onCancelar={() => setModalLogout(false)}
+      onConfirmar={async () => {
+        setModalLogout(false);
+        await logout();
+        router.replace('/(auth)/login');
+      }}
+    />
+
+    {/* Modal cancelar suscripción */}
+    <ConfirmModal
+      visible={modalCancelar}
+      icono="close-circle-outline"
+      titulo="Cancelar suscripción"
+      mensaje={`Para cancelar tu suscripción te llevaremos a ${Platform.OS === 'ios' ? 'App Store' : 'Google Play'}. Desde ahí podrás gestionar o cancelar tu Plan Básico.`}
+      textoCancelar="Volver"
+      textoConfirmar="Ir a la tienda"
+      peligroso
+      onCancelar={() => setModalCancelar(false)}
+      onConfirmar={async () => {
+        setModalCancelar(false);
+        await abrirGestionSuscripcion();
+      }}
+    />
+    </>
   );
 }
 
@@ -302,4 +522,37 @@ const styles = StyleSheet.create({
     boxShadow: '0px 1px 4px rgba(0, 0, 0, 0.04)', elevation: 2,
   },
   btnCerrarSesionTexto: { color: Colors.primario, fontWeight: '600', fontSize: FontSize.md },
+
+  // ── Suscripción ─────────────────────────────────────────────────────────────
+  subBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 10, paddingVertical: 4,
+    borderRadius: BorderRadius.full, alignSelf: 'flex-start', marginBottom: 12,
+  },
+  subBadgeActivo:  { backgroundColor: '#ecfdf5' },
+  subBadgeTrial:   { backgroundColor: '#fffbeb' },
+  subBadgeVencido: { backgroundColor: '#f3f4f6' },
+  subBadgeTexto:   { fontSize: FontSize.xs, fontWeight: '700', letterSpacing: 0.5 },
+
+  subPlanNombre:    { fontSize: FontSize.lg, fontWeight: '700', color: Colors.texto, marginBottom: 4 },
+  subPrecio:        { fontSize: FontSize.sm, color: Colors.textoSecundario, marginBottom: 16 },
+  subDiasRestantes: { fontSize: FontSize.xxl, fontWeight: '700', color: Colors.advertencia },
+  subDiasLabel:     { fontSize: FontSize.xs, color: Colors.textoSecundario, marginBottom: 12 },
+  subLegal:         { fontSize: FontSize.xs, color: '#9ca3af', textAlign: 'center', marginTop: 8 },
+
+  subFila:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  subFilaLabel: { fontSize: FontSize.xs, color: '#6b7280' },
+  subFilaValor: { fontSize: FontSize.xs, fontWeight: '600', color: Colors.texto },
+
+  btnGestionar: {
+    borderWidth: 1.5, borderColor: Colors.primario, borderRadius: BorderRadius.sm,
+    paddingVertical: 11, alignItems: 'center', marginTop: 12,
+  },
+  btnGestionarTexto: { color: Colors.primario, fontWeight: '600', fontSize: FontSize.sm },
+
+  btnCancelarSub:      { alignItems: 'center', paddingVertical: 10, marginTop: 4 },
+  btnCancelarSubTexto: { color: '#9ca3af', fontSize: FontSize.xs, textDecorationLine: 'underline' },
+
+  btnRestaurar:      { alignItems: 'center', paddingVertical: 8, marginTop: 4 },
+  btnRestaurarTexto: { color: Colors.primario, fontSize: FontSize.xs, textDecorationLine: 'underline' },
 });
