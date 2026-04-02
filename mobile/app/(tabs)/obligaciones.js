@@ -12,6 +12,7 @@ import {
 } from '../../services/api';
 import { formatearMoneda } from '../../utils/formateadores';
 import { Colors, Spacing, FontSize, BorderRadius } from '../../constants/theme';
+import ConfirmModal from '../../components/ConfirmModal';
 
 const CATEGORIAS_COSTO = {
   arriendo: 'Arriendo', servicios: 'Servicios', alimentacion: 'Alimentación',
@@ -50,6 +51,9 @@ function calcularPreview({ montoTotal, tasaInteres, plazoAnios, plazoMeses, sist
   return { cuotaMensual: Math.round(cuotaMensual), cuotasTotales: n, interesTotal: Math.round(interesTotal) };
 }
 
+const fmtMiles = (val) => val ? val.replace(/\B(?=(\d{3})+(?!\d))/g, '.') : '';
+const soloDigitos = (text) => text.replace(/\./g, '').replace(/[^0-9]/g, '');
+
 // ==================== FORMULARIOS ====================
 
 function FormIngreso({ inicial, onGuardar, onCancelar }) {
@@ -62,7 +66,7 @@ function FormIngreso({ inicial, onGuardar, onCancelar }) {
       <Text style={st.formLabel}>Nombre del ingreso</Text>
       <TextInput style={st.formInput} value={nombre} onChangeText={setNombre} placeholder="Ej: Sueldo, Pensión" />
       <Text style={st.formLabel}>Monto mensual</Text>
-      <TextInput style={st.formInput} value={monto} onChangeText={setMonto} keyboardType="numeric" placeholder="0" />
+      <TextInput style={st.formInput} value={fmtMiles(monto)} onChangeText={(t) => setMonto(soloDigitos(t))} keyboardType="numeric" placeholder="0" />
       <Text style={st.formLabel}>Categoría</Text>
       <View style={st.formToggleRow}>
         {CATS_ING_ARRAY.map((c) => (
@@ -93,7 +97,7 @@ function FormCosto({ inicial, onGuardar, onCancelar }) {
       <Text style={st.formLabel}>Nombre del costo</Text>
       <TextInput style={st.formInput} value={nombre} onChangeText={setNombre} placeholder="Ej: Arriendo, Luz" />
       <Text style={st.formLabel}>Monto mensual</Text>
-      <TextInput style={st.formInput} value={monto} onChangeText={setMonto} keyboardType="numeric" placeholder="0" />
+      <TextInput style={st.formInput} value={fmtMiles(monto)} onChangeText={(t) => setMonto(soloDigitos(t))} keyboardType="numeric" placeholder="0" />
       <Text style={st.formLabel}>Categoría</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={st.formScrollRow}>
         {CATS_ARRAY.map((c) => (
@@ -146,7 +150,7 @@ function FormDeuda({ inicial, onGuardar, onCancelar }) {
       <Text style={st.formLabel}>Nombre del crédito o institución</Text>
       <TextInput style={st.formInput} value={nombre} onChangeText={setNombre} placeholder="Ej: Banco Estado" />
       <Text style={st.formLabel}>Monto total del crédito</Text>
-      <TextInput style={st.formInput} value={montoTotal} onChangeText={setMontoTotal} keyboardType="numeric" placeholder="0" />
+      <TextInput style={st.formInput} value={fmtMiles(montoTotal)} onChangeText={(t) => setMontoTotal(soloDigitos(t))} keyboardType="numeric" placeholder="0" />
       <Text style={st.formLabel}>Tasa de interés anual (%)</Text>
       <TextInput style={st.formInput} value={tasaInteres} onChangeText={setTasaInteres} keyboardType="numeric" placeholder="0" />
       <View style={st.formRow}>
@@ -200,6 +204,7 @@ export default function Obligaciones() {
   const [modal, setModal] = useState(null);
   const [proyOpen, setProyOpen] = useState(null);
   const [tablaAmort, setTablaAmort] = useState(null);
+  const [confirmEliminar, setConfirmEliminar] = useState(null);
   const [escenario, setEscenario] = useState('conDeuda');
 
   const cargar = async () => {
@@ -217,20 +222,26 @@ export default function Obligaciones() {
   const handleGuardarIngreso = async (datos) => {
     try { if (modal.editando) await actualizarIngreso(modal.editando._id, datos); else await crearIngreso(datos); setModal(null); cargar(); } catch (err) { console.error(err); }
   };
-  const handleEliminarIngreso = (id) => {
-    Alert.alert('Eliminar', '¿Eliminar este ingreso?', [{ text: 'Cancelar' }, { text: 'Eliminar', style: 'destructive', onPress: async () => { await eliminarIngreso(id); cargar(); } }]);
-  };
+  const handleEliminarIngreso = (id) => setConfirmEliminar({ tipo: 'ingreso', id });
   const handleGuardarCosto = async (datos) => {
     try { if (modal.editando) await actualizarCostoFijo(modal.editando._id, datos); else await crearCostoFijo(datos); setModal(null); cargar(); } catch (err) { console.error(err); }
   };
-  const handleEliminarCosto = (id) => {
-    Alert.alert('Eliminar', '¿Eliminar este costo fijo?', [{ text: 'Cancelar' }, { text: 'Eliminar', style: 'destructive', onPress: async () => { await eliminarCostoFijo(id); cargar(); } }]);
-  };
+  const handleEliminarCosto = (id) => setConfirmEliminar({ tipo: 'costo', id });
   const handleGuardarDeuda = async (datos) => {
     try { if (modal.editando) await actualizarDeuda(modal.editando._id, datos); else await crearDeuda(datos); setModal(null); cargar(); } catch (err) { console.error(err); }
   };
-  const handleEliminarDeuda = (id) => {
-    Alert.alert('Eliminar', '¿Eliminar esta deuda?', [{ text: 'Cancelar' }, { text: 'Eliminar', style: 'destructive', onPress: async () => { await eliminarDeuda(id); cargar(); } }]);
+  const handleEliminarDeuda = (id) => setConfirmEliminar({ tipo: 'deuda', id });
+
+  const ejecutarEliminar = async () => {
+    if (!confirmEliminar) return;
+    const { tipo, id } = confirmEliminar;
+    setConfirmEliminar(null);
+    try {
+      if (tipo === 'ingreso') await eliminarIngreso(id);
+      else if (tipo === 'costo') await eliminarCostoFijo(id);
+      else if (tipo === 'deuda') await eliminarDeuda(id);
+      cargar();
+    } catch {}
   };
   const handleVerTabla = async (deudaId) => {
     if (tablaAmort?.deudaId === deudaId) { setTablaAmort(null); return; }
@@ -676,6 +687,22 @@ export default function Obligaciones() {
           </View>
         </View>
       </RNModal>
+
+      <ConfirmModal
+        visible={!!confirmEliminar}
+        icono="trash-outline"
+        titulo="Eliminar"
+        mensaje={
+          confirmEliminar?.tipo === 'ingreso' ? '¿Eliminar este ingreso?' :
+          confirmEliminar?.tipo === 'costo'   ? '¿Eliminar este costo fijo?' :
+                                                '¿Eliminar esta deuda?'
+        }
+        textoCancelar="Cancelar"
+        textoConfirmar="Eliminar"
+        peligroso
+        onCancelar={() => setConfirmEliminar(null)}
+        onConfirmar={ejecutarEliminar}
+      />
     </View>
   );
 }

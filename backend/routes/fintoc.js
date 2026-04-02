@@ -129,6 +129,7 @@ router.post('/exchange', async (req, res) => {
         if (bulkOps.length > 0) {
           await Movement.bulkWrite(bulkOps, { ordered: false });
         }
+        await Account.findByIdAndUpdate(entry.account._id, { lastSyncedAt: new Date() });
         entry.movements = movementsData;
         console.log(`Cuenta ${accData.id}: ${movementsData.length} movimientos sincronizados`);
       } catch (movError) {
@@ -241,7 +242,7 @@ router.get('/accounts', async (req, res) => {
       accounts.map(async (account) => {
         const movements = await Movement.find({ account: account._id })
           .sort({ postDate: -1 })
-          .limit(20);
+          .limit(500);
 
         return {
           id: account._id,
@@ -254,6 +255,7 @@ router.get('/accounts', async (req, res) => {
           type: account.type,
           institution: account.link?.institutionName || '',
           holder: account.link?.holderName || '',
+          lastSyncedAt: account.lastSyncedAt || null,
           movements: movements.map((mov) => ({
             id: mov._id,
             amount: mov.amount,
@@ -284,10 +286,25 @@ router.get('/accounts/:accountId/movements', async (req, res) => {
     if (!account) {
       return res.status(404).json({ message: 'Cuenta no encontrada' });
     }
-    const movements = await Movement.find({ account: accountId })
-      .sort({ postDate: -1 })
-      .limit(50);
-    res.json(movements);
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(200, Math.max(1, parseInt(req.query.limit) || 100));
+    const skip = (page - 1) * limit;
+
+    const [movements, total] = await Promise.all([
+      Movement.find({ account: accountId }).sort({ postDate: -1 }).skip(skip).limit(limit),
+      Movement.countDocuments({ account: accountId }),
+    ]);
+
+    res.json({
+      movements,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        hasMore: page * limit < total,
+      },
+    });
   } catch (error) {
     console.error('Error obteniendo movimientos:', error.message);
     res.status(500).json({ message: 'Error al obtener movimientos' });
@@ -369,22 +386,16 @@ router.delete('/links/:linkId', async (req, res) => {
   }
 });
 
-// POST /api/fintoc/refresh
-router.post('/refresh', async (req, res) => {
+// Mapa para evitar refreshes simultáneos por usuario
+const refreshEnProgreso = new Map();
+
+// Lógica de refresh extraída para ejecutarse en background
+async function ejecutarRefresh(userId, links) {
   try {
-    const links = await FintocLink.find({ user: req.user._id, status: 'active' });
-
-    if (links.length === 0) {
-      return res.status(404).json({ message: 'No hay conexiones bancarias activas' });
-    }
-
-    const results = [];
-
     for (const link of links) {
       try {
         const accountsData = await fintocService.getAccounts(link.linkToken);
 
-        // Procesar cuentas en paralelo por link
         const accountPromises = accountsData.map(async (accData) => {
           const account = await Account.findOneAndUpdate(
             { fintocId: accData.id },
@@ -400,23 +411,26 @@ router.post('/refresh', async (req, res) => {
 
           if (!account) return null;
 
-          // Sincronizar saldo de créditos vinculados (tarjetas/líneas)
           if (accData.type === 'credit_card' || accData.type === 'line_of_credit') {
             const cupoTotal = Math.abs(accData.balance?.limit || 0);
             const disponible = Math.abs(accData.balance?.available || 0);
             const deudaReal = cupoTotal > 0 ? Math.max(cupoTotal - disponible, 0) : Math.abs(accData.balance?.current || 0);
             await Credit.findOneAndUpdate(
               { fintocAccountId: account._id },
-              {
-                saldoPendiente: deudaReal,
-                montoOriginal: cupoTotal,
-              }
+              { saldoPendiente: deudaReal, montoOriginal: cupoTotal }
             );
           }
 
-          const movementsData = await fintocService.getMovements(accData.id, link.linkToken, { since: '2000-01-01' });
+          // 30 días de margen para capturar pendientes confirmados después del último sync
+          let sinceDate = '2000-01-01';
+          if (account.lastSyncedAt) {
+            const margen = new Date(account.lastSyncedAt);
+            margen.setDate(margen.getDate() - 30);
+            sinceDate = margen.toISOString().split('T')[0];
+          }
 
-          // Guardar movimientos en bulk
+          const movementsData = await fintocService.getMovements(accData.id, link.linkToken, { since: sinceDate });
+
           if (movementsData.length > 0) {
             const bulkOps = movementsData.map((movData) => {
               const fechaPost = movData.post_date ? new Date(movData.post_date) : null;
@@ -426,7 +440,7 @@ router.post('/refresh', async (req, res) => {
                   filter: { fintocId: movData.id },
                   update: {
                     $set: {
-                      user: req.user._id,
+                      user: userId,
                       fintocId: movData.id,
                       amount: movData.amount || 0,
                       description: movData.description || '',
@@ -448,29 +462,22 @@ router.post('/refresh', async (req, res) => {
             await Movement.bulkWrite(bulkOps, { ordered: false });
           }
 
-          return {
-            accountId: account.fintocId,
-            name: account.name,
-            movementsUpdated: movementsData.length,
-          };
+          await Account.findByIdAndUpdate(account._id, { lastSyncedAt: new Date() });
+          console.log(`[Refresh] Cuenta ${accData.id}: ${movementsData.length} movimientos (desde ${sinceDate})`);
         });
 
-        const accountResults = await Promise.allSettled(accountPromises);
-        for (const r of accountResults) {
-          if (r.status === 'fulfilled' && r.value) results.push(r.value);
-        }
+        await Promise.allSettled(accountPromises);
       } catch (linkError) {
-        console.error(`Error refrescando link ${link._id}:`, linkError.message);
+        console.error(`[Refresh] Error en link ${link._id}:`, linkError.message);
         await FintocLink.findByIdAndUpdate(link._id, { status: 'error' });
-        results.push({ linkId: link._id, error: linkError.message });
       }
     }
 
-    // Recalcular saldo de líneas de crédito desde transacciones de cuenta corriente
+    // Recalcular saldo de líneas de crédito
     try {
-      const lineasCredito = await Credit.find({ user: req.user._id, tipoCredito: 'linea_credito', estado: 'activo' });
+      const lineasCredito = await Credit.find({ user: userId, tipoCredito: 'linea_credito', estado: 'activo' });
       if (lineasCredito.length > 0) {
-        const cuentasCorrientes = await Account.find({ user: req.user._id, type: { $in: ['checking_account', 'sight_account'] } }).select('_id');
+        const cuentasCorrientes = await Account.find({ user: userId, type: { $in: ['checking_account', 'sight_account'] } }).select('_id');
         if (cuentasCorrientes.length > 0) {
           const accountIds = cuentasCorrientes.map((c) => c._id);
           const movsLinea = await Movement.find({ account: { $in: accountIds }, description: { $regex: /linea\s*(de\s*)?cred/i } });
@@ -480,17 +487,42 @@ router.post('/refresh', async (req, res) => {
           for (const lc of lineasCredito) {
             await Credit.findByIdAndUpdate(lc._id, { saldoPendiente: saldoCalculado });
           }
-          console.log(`Refresh: Líneas de crédito actualizadas, saldo=${saldoCalculado}`);
         }
       }
     } catch (lcErr) {
-      console.error('Error recalculando líneas de crédito:', lcErr.message);
+      console.error('[Refresh] Error recalculando líneas de crédito:', lcErr.message);
     }
 
-    res.json({ message: 'Datos actualizados', results });
+    console.log(`[Refresh] Completado para usuario ${userId}`);
+  } finally {
+    refreshEnProgreso.delete(String(userId));
+  }
+}
+
+// POST /api/fintoc/refresh — responde inmediatamente, procesa en background
+router.post('/refresh', async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    // Si ya hay un refresh corriendo para este usuario, no iniciar otro
+    if (refreshEnProgreso.has(String(userId))) {
+      return res.json({ message: 'Sincronización ya en progreso', status: 'running' });
+    }
+
+    const links = await FintocLink.find({ user: userId, status: 'active' });
+    if (links.length === 0) {
+      return res.status(404).json({ message: 'No hay conexiones bancarias activas' });
+    }
+
+    // Marcar como en progreso y lanzar en background sin await
+    refreshEnProgreso.set(String(userId), true);
+    ejecutarRefresh(userId, links); // sin await — procesa en background
+
+    // Responder inmediatamente al cliente
+    res.json({ message: 'Sincronización iniciada', status: 'running' });
   } catch (error) {
-    console.error('Error refrescando datos:', error.message);
-    res.status(500).json({ message: 'Error al refrescar datos' });
+    console.error('Error iniciando refresh:', error.message);
+    res.status(500).json({ message: 'Error al iniciar la sincronización' });
   }
 });
 
@@ -560,6 +592,8 @@ router.post('/resync', async (req, res) => {
             await Movement.bulkWrite(bulkOps, { ordered: false });
           }
 
+          await Account.findByIdAndUpdate(account._id, { lastSyncedAt: new Date() });
+
           return movementsData.length;
         });
 
@@ -577,6 +611,29 @@ router.post('/resync', async (req, res) => {
   } catch (error) {
     console.error('Error en resync:', error.message);
     res.status(500).json({ message: 'Error al re-sincronizar datos' });
+  }
+});
+
+// GET /api/fintoc/sync-status
+router.get('/sync-status', async (req, res) => {
+  try {
+    const accounts = await Account.find({ user: req.user._id })
+      .select('_id name lastSyncedAt')
+      .lean();
+
+    const lastSync = accounts.reduce((latest, a) => {
+      if (!a.lastSyncedAt) return latest;
+      return !latest || a.lastSyncedAt > latest ? a.lastSyncedAt : latest;
+    }, null);
+
+    res.json({
+      accounts: accounts.map((a) => ({ id: a._id, name: a.name, lastSyncedAt: a.lastSyncedAt })),
+      lastSync,
+      sincronizando: refreshEnProgreso.has(String(req.user._id)),
+    });
+  } catch (error) {
+    console.error('Error obteniendo sync status:', error.message);
+    res.status(500).json({ message: 'Error al obtener estado de sincronización' });
   }
 });
 

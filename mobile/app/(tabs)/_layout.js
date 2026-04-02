@@ -1,29 +1,20 @@
+import { useState } from 'react';
 import { Tabs, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, FontSize } from '../../constants/theme';
 import { useAuth } from '../../contexts/AuthContext';
-import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
+import ConfirmModal from '../../components/ConfirmModal';
 
 function HeaderRight() {
   const router = useRouter();
   const { logout } = useAuth();
+  const [modalVisible, setModalVisible] = useState(false);
 
-  const confirmarCerrarSesion = () => {
-    Alert.alert(
-      'Cerrar sesión',
-      '¿Seguro que quieres cerrar la sesión?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Cerrar sesión',
-          style: 'destructive',
-          onPress: async () => {
-            await logout();
-            router.replace('/(auth)/login');
-          },
-        },
-      ]
-    );
+  const doLogout = async () => {
+    setModalVisible(false);
+    await logout();
+    router.replace('/(auth)/login');
   };
 
   return (
@@ -31,9 +22,20 @@ function HeaderRight() {
       <TouchableOpacity style={hs.btn} onPress={() => router.push('/configuracion')}>
         <Ionicons name="settings-outline" size={20} color="#fff" />
       </TouchableOpacity>
-      <TouchableOpacity style={hs.btn} onPress={confirmarCerrarSesion}>
+      <TouchableOpacity style={hs.btn} onPress={() => setModalVisible(true)}>
         <Ionicons name="log-out-outline" size={20} color="rgba(255,255,255,0.85)" />
       </TouchableOpacity>
+      <ConfirmModal
+        visible={modalVisible}
+        icono="log-out-outline"
+        titulo="Cerrar sesión"
+        mensaje="¿Seguro que quieres cerrar la sesión?"
+        textoCancelar="Cancelar"
+        textoConfirmar="Cerrar sesión"
+        peligroso
+        onCancelar={() => setModalVisible(false)}
+        onConfirmar={doLogout}
+      />
     </View>
   );
 }
@@ -56,7 +58,7 @@ const hs = StyleSheet.create({
 });
 
 export default function TabLayout() {
-  const { user, cargando } = useAuth();
+  const { cargando } = useAuth();
 
   if (cargando) {
     return (
@@ -65,8 +67,6 @@ export default function TabLayout() {
       </View>
     );
   }
-
-  if (!user) return null;
 
   return (
     <Tabs

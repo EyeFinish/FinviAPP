@@ -30,6 +30,12 @@
   gap: 12px;
 }
 
+.ultima-actualizacion {
+  font-size: 12px;
+  color: #888;
+  white-space: nowrap;
+}
+
 /* ===== BALANCE TOTAL ===== */
 .balance-total {
   background: linear-gradient(135deg, var(--color-primario) 0%, var(--color-primario-oscuro) 100%);
@@ -301,6 +307,26 @@
 
 .movimientos-vacio-texto {
   font-size: 14px;
+}
+
+.btn-ver-mas-movs {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  margin-top: 4px;
+  background: none;
+  border: none;
+  border-top: 1px solid var(--color-borde-claro);
+  color: var(--color-primario);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.15s;
+}
+
+.btn-ver-mas-movs:hover {
+  background-color: var(--color-fondo);
 }
 
 /* ===== ESTADO VACÍO ===== */

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, RefreshControl,
   TouchableOpacity, ActivityIndicator, Modal, FlatList,
@@ -8,10 +8,10 @@ import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
 import { useAuth } from '../../contexts/AuthContext';
 import {
-  obtenerCuentas,
+  obtenerCuentas, refrescarDatos,
   obtenerProgresoMensual, obtenerSinAsignarAgrupados,
   asignarMovimiento, desasignarMovimiento, autoAsignarMovimientos,
-  obtenerCostosFijos, obtenerDeudas,
+  obtenerCostosFijos, obtenerDeudas, obtenerSyncStatus,
 } from '../../services/api';
 import { formatearMoneda, formatearFecha, calcularSaludFinanciera } from '../../utils/formateadores';
 import { Colors, Spacing, FontSize, BorderRadius } from '../../constants/theme';
@@ -67,6 +67,11 @@ export default function Dashboard() {
   const [modalVisible, setModalVisible] = useState(false);
   const [movimientoSeleccionado, setMovimientoSeleccionado] = useState(null);
   const [asignando, setAsignando] = useState(false);
+
+  // Última sincronización
+  const [lastSync, setLastSync] = useState(null);
+  const pollRef = useRef(null);
+  const lastSyncRef = useRef(null);
 
   // Auto-asignar
   const [autoAsignando, setAutoAsignando] = useState(false);
@@ -129,9 +134,69 @@ export default function Dashboard() {
     }
   };
 
+  // Refresca Fintoc en background: dispara el refresh y hace polling hasta que lleguen datos nuevos
+  const refrescarEnSegundoPlano = async () => {
+    try {
+      // Capturar el lastSync ANTES del refresh para detectar el cambio
+      let syncAntes = null;
+      try {
+        const statusAntes = await obtenerSyncStatus();
+        syncAntes = statusAntes.data?.lastSync;
+        lastSyncRef.current = syncAntes;
+        setLastSync(syncAntes);
+      } catch { /* silencioso */ }
+
+      // Disparar el refresh — el backend responde inmediato (async)
+      refrescarDatos().catch(() => {});
+
+      // Polling cada 3s para detectar cuándo el backend terminó
+      let intentos = 0;
+      const maxIntentos = 40; // 40 * 3s = 2 minutos máximo
+      const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
+
+      while (intentos < maxIntentos) {
+        await esperar(3000);
+        try {
+          const statusNuevo = await obtenerSyncStatus();
+          const syncNuevo = statusNuevo.data?.lastSync;
+          setLastSync(syncNuevo);
+
+          // Si el lastSync es más reciente, hay datos nuevos
+          if (syncNuevo && (!syncAntes || new Date(syncNuevo) > new Date(syncAntes))) {
+            lastSyncRef.current = syncNuevo;
+            await cargarDatos();
+            return; // terminamos
+          }
+
+          // Si el backend ya no está sincronizando y no cambió, terminamos igual
+          if (!statusNuevo.data?.sincronizando) break;
+        } catch { /* silencioso */ }
+        intentos++;
+      }
+    } catch { /* silencioso */ }
+  };
+
   useFocusEffect(
     useCallback(() => {
       cargarDatos();
+      refrescarEnSegundoPlano();
+
+      // Polling cada 5 minutos para detectar syncronizaciones del cron
+      pollRef.current = setInterval(async () => {
+        try {
+          const status = await obtenerSyncStatus();
+          const nuevoSync = status.data?.lastSync;
+          setLastSync(nuevoSync);
+          if (nuevoSync && lastSyncRef.current && new Date(nuevoSync) > new Date(lastSyncRef.current)) {
+            lastSyncRef.current = nuevoSync;
+            await cargarDatos();
+          }
+        } catch { /* silencioso */ }
+      }, 5 * 60 * 1000);
+
+      return () => {
+        if (pollRef.current) clearInterval(pollRef.current);
+      };
     }, [])
   );
 
@@ -148,8 +213,8 @@ export default function Dashboard() {
   const compromisoMensual = resumenOblig.compromisoMensual;
   const salud = calcularSaludFinanciera(balanceTotal, totalDeuda, compromisoMensual);
 
-  const handleAbrirAsignacion = (movimiento) => {
-    setMovimientoSeleccionado(movimiento);
+  const handleAbrirAsignacion = (grupo) => {
+    setMovimientoSeleccionado(grupo);
     setModalVisible(true);
   };
 
@@ -157,7 +222,9 @@ export default function Dashboard() {
     if (!movimientoSeleccionado || asignando) return;
     setAsignando(true);
     try {
-      await asignarMovimiento(movimientoSeleccionado._id, obligacion.tipo, obligacion._id);
+      for (const movId of movimientoSeleccionado.ids) {
+        await asignarMovimiento(movId, obligacion.tipo, obligacion._id);
+      }
       setModalVisible(false);
       setMovimientoSeleccionado(null);
       await cargarDatos();
@@ -238,6 +305,11 @@ export default function Dashboard() {
         <View>
           <Text style={styles.saludo}>Hola, {user?.nombre?.split(' ')[0]} 👋</Text>
           <Text style={styles.subtitulo}>Tu resumen financiero</Text>
+          {lastSync && (
+            <Text style={styles.syncIndicador}>
+              Sinc. {new Date(lastSync).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
+            </Text>
+          )}
         </View>
       </View>
 
@@ -420,22 +492,40 @@ export default function Dashboard() {
                     </View>
                   )}
 
-                  {cat.movimientos.map((mov) => (
+                  {Object.values(
+                    cat.movimientos.reduce((acc, mov) => {
+                      const key = (mov.description || 'Sin descripción').trim();
+                      if (!acc[key]) acc[key] = { description: key, ids: [mov._id], totalAmount: mov.amount, lastDate: mov.postDate || mov.transactionDate };
+                      else {
+                        acc[key].ids.push(mov._id);
+                        acc[key].totalAmount += mov.amount;
+                        if (mov.postDate && new Date(mov.postDate) > new Date(acc[key].lastDate)) acc[key].lastDate = mov.postDate;
+                      }
+                      return acc;
+                    }, {})
+                  ).map((grupo) => (
                     <TouchableOpacity
-                      key={mov._id}
+                      key={grupo.description}
                       style={styles.movItem}
-                      onPress={() => handleAbrirAsignacion(mov)}
+                      onPress={() => handleAbrirAsignacion(grupo)}
                       activeOpacity={0.7}
                     >
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.movDescripcion} numberOfLines={1}>
-                          {mov.description || 'Sin descripción'}
-                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Text style={styles.movDescripcion} numberOfLines={1}>
+                            {grupo.description}
+                          </Text>
+                          {grupo.ids.length > 1 && (
+                            <View style={{ backgroundColor: '#eeeef8', borderRadius: 10, paddingHorizontal: 6, paddingVertical: 1 }}>
+                              <Text style={{ fontSize: 11, fontWeight: '600', color: '#6c6fa3' }}>×{grupo.ids.length}</Text>
+                            </View>
+                          )}
+                        </View>
                         <Text style={styles.movFecha}>
-                          {formatearFecha(mov.postDate)}
+                          {formatearFecha(grupo.lastDate)}
                         </Text>
                       </View>
-                      <Text style={styles.movMonto}>{formatearMoneda(Math.abs(mov.amount))}</Text>
+                      <Text style={styles.movMonto}>{formatearMoneda(Math.abs(grupo.totalAmount))}</Text>
                       <Ionicons name="chevron-forward" size={18} color={Colors.textoSecundario} />
                     </TouchableOpacity>
                   ))}
@@ -466,11 +556,18 @@ export default function Dashboard() {
 
             {movimientoSeleccionado && (
               <View style={styles.modalMovInfo}>
-                <Text style={styles.modalMovDesc} numberOfLines={2}>
-                  {movimientoSeleccionado.description || 'Sin descripción'}
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <Text style={styles.modalMovDesc} numberOfLines={2}>
+                    {movimientoSeleccionado.description || 'Sin descripción'}
+                  </Text>
+                  {movimientoSeleccionado.ids?.length > 1 && (
+                    <View style={{ backgroundColor: '#eeeef8', borderRadius: 10, paddingHorizontal: 6, paddingVertical: 1 }}>
+                      <Text style={{ fontSize: 11, fontWeight: '600', color: '#6c6fa3' }}>×{movimientoSeleccionado.ids.length}</Text>
+                    </View>
+                  )}
+                </View>
                 <Text style={styles.modalMovMonto}>
-                  {formatearMoneda(Math.abs(movimientoSeleccionado.amount))}
+                  {formatearMoneda(Math.abs(movimientoSeleccionado.totalAmount))}
                 </Text>
               </View>
             )}
@@ -597,6 +694,7 @@ const styles = StyleSheet.create({
   },
   saludo: { fontSize: FontSize.xl, fontWeight: '700', color: Colors.texto },
   subtitulo: { fontSize: FontSize.sm, color: Colors.textoSecundario, marginTop: 2 },
+  syncIndicador: { fontSize: FontSize.xs, color: Colors.textoSecundario, marginTop: 1, opacity: 0.7 },
   logoutBtn: { padding: 8 },
   card: {
     backgroundColor: '#fff', borderRadius: BorderRadius.lg, marginHorizontal: Spacing.lg,

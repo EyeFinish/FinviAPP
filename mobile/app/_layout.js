@@ -19,7 +19,7 @@ function RootNavigator() {
     } else if (user && !enTabs && segments[0] !== 'configuracion') {
       router.replace('/(tabs)');
     }
-  }, [user, cargando]);
+  }, [user, cargando, segments]);
 
   return (
     <Stack screenOptions={{ headerShown: false }}>

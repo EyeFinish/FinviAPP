@@ -11,6 +11,25 @@ function TablaMovimientos({ movimientos, moneda = 'CLP' }) {
     );
   }
 
+  const gruposMap = movimientos.reduce((acc, mov) => {
+    const key = (mov.description || 'Sin descripción').trim();
+    if (!acc[key]) {
+      acc[key] = { description: key, count: 0, totalAmount: 0, lastDate: null, type: mov.type, hasPending: false };
+    }
+    acc[key].count += 1;
+    acc[key].totalAmount += mov.amount;
+    const movDate = mov.postDate || mov.transactionDate;
+    if (!acc[key].lastDate || new Date(movDate) > new Date(acc[key].lastDate)) {
+      acc[key].lastDate = movDate;
+    }
+    if (mov.pending) acc[key].hasPending = true;
+    return acc;
+  }, {});
+
+  const grupos = Object.values(gruposMap).sort(
+    (a, b) => new Date(b.lastDate) - new Date(a.lastDate)
+  );
+
   return (
     <div style={{ overflowX: 'auto' }}>
       <table className="movimientos-tabla">
@@ -23,26 +42,31 @@ function TablaMovimientos({ movimientos, moneda = 'CLP' }) {
           </tr>
         </thead>
         <tbody>
-          {movimientos.map((mov, index) => (
-            <tr key={mov.id || index}>
+          {grupos.map((grupo) => (
+            <tr key={grupo.description}>
               <td style={{ whiteSpace: 'nowrap', color: '#555a7e' }}>
-                {formatearFecha(mov.postDate || mov.transactionDate)}
+                {formatearFecha(grupo.lastDate)}
               </td>
               <td>
-                <div className="movimiento-descripcion">
-                  {mov.description || 'Sin descripción'}
+                <div className="movimiento-descripcion" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  {grupo.description}
+                  {grupo.count > 1 && (
+                    <span style={{
+                      fontSize: '11px', fontWeight: 600, color: '#6c6fa3',
+                      background: '#eeeef8', borderRadius: '10px', padding: '1px 7px'
+                    }}>
+                      ×{grupo.count}
+                    </span>
+                  )}
                 </div>
-                {mov.comment && (
-                  <div className="movimiento-comentario">{mov.comment}</div>
-                )}
               </td>
               <td>
-                <span className="movimiento-tipo-badge">{mov.type || '-'}</span>
+                <span className="movimiento-tipo-badge">{grupo.type || '-'}</span>
               </td>
-              <td className={`movimiento-monto ${mov.amount >= 0 ? 'ingreso' : 'egreso'}`}>
-                {mov.amount >= 0 ? '+' : ''}
-                {formatearMoneda(mov.amount, moneda)}
-                {mov.pending && <span className="movimiento-pendiente">(pendiente)</span>}
+              <td className={`movimiento-monto ${grupo.totalAmount >= 0 ? 'ingreso' : 'egreso'}`}>
+                {grupo.totalAmount >= 0 ? '+' : ''}
+                {formatearMoneda(grupo.totalAmount, moneda)}
+                {grupo.hasPending && <span className="movimiento-pendiente">(pendiente)</span>}
               </td>
             </tr>
           ))}

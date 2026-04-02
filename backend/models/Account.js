@@ -51,6 +51,10 @@ const accountSchema = new mongoose.Schema(
       ref: 'FintocLink',
       required: true,
     },
+    lastSyncedAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,

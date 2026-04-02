@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   obtenerCuentas, refrescarDatos, obtenerResumenCreditos, obtenerConexiones, eliminarConexion,
   obtenerProgresoMensual, obtenerSinAsignarAgrupados, asignarMovimiento, desasignarMovimiento,
-  autoAsignarMovimientos, obtenerCostosFijos, obtenerDeudas,
+  autoAsignarMovimientos, obtenerCostosFijos, obtenerDeudas, obtenerSyncStatus,
 } from '../servicios/api';
 import {
   Building2, Link2, RefreshCw, Loader, AlertTriangle, ChevronDown, ChevronUp, Zap, LinkIcon,
@@ -15,7 +15,7 @@ import TablaMovimientos from '../componentes/TablaMovimientos';
 import SaludFinanciera from '../componentes/SaludFinanciera';
 import EstadoFinanciero from '../componentes/EstadoFinanciero';
 import ObligacionFinanciera from '../componentes/ObligacionFinanciera';
-import { formatearMoneda, traducirTipoCuenta, calcularSaludFinanciera, obtenerInfoBanco, agruparCuentasPorBanco } from '../utilidades/formateadores';
+import { formatearMoneda, formatearFecha, traducirTipoCuenta, calcularSaludFinanciera, obtenerInfoBanco, agruparCuentasPorBanco } from '../utilidades/formateadores';
 import '../estilos/dashboard.css';
 import '../estilos/compromisos.css';
 
@@ -42,11 +42,12 @@ const getCatIcono = (iconName, size = 18, color) => {
 };
 
 function Dashboard({ seccion = 'dashboard' }) {
-  const [cuentas, setCuentas] = useState([]); 
+  const [cuentas, setCuentas] = useState([]);
   const [cuentaSeleccionada, setCuentaSeleccionada] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refrescando, setRefrescando] = useState(false);
   const [error, setError] = useState(null);
+  const [limiteMovs, setLimiteMovs] = useState(15);
 
   // Estado para créditos
   const [resumenCreditos, setResumenCreditos] = useState(null);
@@ -63,6 +64,9 @@ function Dashboard({ seccion = 'dashboard' }) {
   const [asignando, setAsignando] = useState(null); // movId being assigned
   const [expandedCat, setExpandedCat] = useState(null);
 
+  // Última sincronización con Fintoc
+  const [lastSync, setLastSync] = useState(null);
+
   // Auto-asignar
   const [autoAsignando, setAutoAsignando] = useState(false);
   const [modalAutoAsignar, setModalAutoAsignar] = useState(false);
@@ -76,20 +80,18 @@ function Dashboard({ seccion = 'dashboard' }) {
     return `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
   };
 
-  const cargarCuentas = useCallback(async () => {
+  const cargarCuentas = useCallback(async (silente = false) => {
     try {
-      setLoading(true);
-      setError(null);
+      if (!silente) { setLoading(true); setError(null); }
       const data = await obtenerCuentas();
       setCuentas(data);
       if (data.length > 0) {
         setCuentaSeleccionada((prev) => prev || data[0]);
       }
     } catch (err) {
-      console.error('Error cargando cuentas:', err);
-      setError(err.response?.data?.message || 'Error al cargar las cuentas');
+      if (!silente) setError(err.response?.data?.message || 'Error al cargar las cuentas');
     } finally {
-      setLoading(false);
+      if (!silente) setLoading(false);
     }
   }, []);
 
@@ -159,7 +161,59 @@ function Dashboard({ seccion = 'dashboard' }) {
     cargarCreditos();
     cargarConexiones();
     cargarCompromisos();
-  }, [cargarCuentas, cargarCreditos, cargarConexiones, cargarCompromisos, seccion]);
+
+    // Refrescar en background: dispara y hace polling hasta detectar datos nuevos
+    (async () => {
+      try {
+        let syncAntes = null;
+        try {
+          const st = await obtenerSyncStatus();
+          syncAntes = st.lastSync;
+        } catch { /* silencioso */ }
+
+        refrescarDatos().catch(() => {});
+
+        let intentos = 0;
+        const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
+        while (intentos < 40) {
+          await esperar(3000);
+          try {
+            const st = await obtenerSyncStatus();
+            setLastSync(st.lastSync);
+            if (st.lastSync && (!syncAntes || new Date(st.lastSync) > new Date(syncAntes))) {
+              await cargarCuentas(true);
+              await cargarCompromisos();
+              return;
+            }
+            if (!st.sincronizando) break;
+          } catch { /* silencioso */ }
+          intentos++;
+        }
+      } catch { /* silencioso */ }
+    })();
+  }, [cargarCuentas, cargarCreditos, cargarConexiones, cargarCompromisos, seccion]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Polling cada 5 minutos para detectar sincronizaciones del cron
+  useEffect(() => {
+    let prevSync = null;
+
+    const checkSync = async () => {
+      try {
+        const status = await obtenerSyncStatus();
+        setLastSync(status.lastSync);
+        if (status.lastSync && prevSync && new Date(status.lastSync) > new Date(prevSync)) {
+          await cargarCuentas(true);
+          await cargarCompromisos();
+        }
+        prevSync = status.lastSync;
+      } catch {
+        // silencioso
+      }
+    };
+
+    const intervalo = setInterval(checkSync, 5 * 60 * 1000);
+    return () => clearInterval(intervalo);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleRefrescar = async () => {
     try {
@@ -179,6 +233,7 @@ function Dashboard({ seccion = 'dashboard' }) {
 
   const handleSeleccionarCuenta = (cuenta) => {
     setCuentaSeleccionada(cuenta);
+    setLimiteMovs(15);
   };
 
   const handleEliminarConexion = async (linkId) => {
@@ -208,12 +263,41 @@ function Dashboard({ seccion = 'dashboard' }) {
     }
   };
 
+  const handleAsignarGrupo = async (grupoKey, movIds) => {
+    const valor = seleccionAsignar[grupoKey];
+    if (!valor) return;
+    const [tipo, referenciaId] = valor.split('_');
+    setAsignando(grupoKey);
+    try {
+      for (const movId of movIds) {
+        await asignarMovimiento(movId, tipo, referenciaId);
+      }
+      setSeleccionAsignar((prev) => { const n = { ...prev }; delete n[grupoKey]; return n; });
+      await cargarCompromisos();
+    } catch (err) {
+      console.error('Error asignando grupo:', err);
+    } finally {
+      setAsignando(null);
+    }
+  };
+
   const handleDesasignar = async (movId) => {
     try {
       await desasignarMovimiento(movId);
       await cargarCompromisos();
     } catch (err) {
       console.error('Error desasignando:', err);
+    }
+  };
+
+  const handleDesasignarGrupo = async (movIds) => {
+    try {
+      for (const movId of movIds) {
+        await desasignarMovimiento(movId);
+      }
+      await cargarCompromisos();
+    } catch (err) {
+      console.error('Error desasignando grupo:', err);
     }
   };
 
@@ -305,6 +389,11 @@ function Dashboard({ seccion = 'dashboard' }) {
             <p className="dashboard-subtitulo">Resumen de tus finanzas personales</p>
           </div>
           <div className="dashboard-acciones">
+            {lastSync && (
+              <span className="ultima-actualizacion" title="Última sincronización automática">
+                Sincronizado {new Date(lastSync).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
             <button
               onClick={handleRefrescar}
               disabled={refrescando}
@@ -455,11 +544,26 @@ function Dashboard({ seccion = 'dashboard' }) {
 
                     {ob.movimientos.length > 0 && (
                       <div className="obligacion-movs">
-                        {ob.movimientos.map((mov) => (
-                          <div key={mov._id} className="obligacion-mov-item">
-                            <span className="mov-desc">{mov.description || 'Sin descripción'}</span>
-                            <span className="mov-monto">{formatearMoneda(Math.abs(mov.amount))}</span>
-                            <button className="btn-desasignar-sm" onClick={() => handleDesasignar(mov._id)} title="Quitar asignación">✕</button>
+                        {Object.values(
+                          ob.movimientos.reduce((acc, mov) => {
+                            const key = (mov.description || 'Sin descripción').trim();
+                            if (!acc[key]) acc[key] = { description: key, ids: [], totalAmount: 0 };
+                            acc[key].ids.push(mov._id);
+                            acc[key].totalAmount += mov.amount;
+                            return acc;
+                          }, {})
+                        ).map((grupo) => (
+                          <div key={grupo.description} className="obligacion-mov-item">
+                            <span className="mov-desc">
+                              {grupo.description}
+                              {grupo.ids.length > 1 && (
+                                <span style={{ marginLeft: '6px', fontSize: '11px', fontWeight: 600, color: '#6c6fa3', background: '#eeeef8', borderRadius: '10px', padding: '1px 7px' }}>
+                                  ×{grupo.ids.length}
+                                </span>
+                              )}
+                            </span>
+                            <span className="mov-monto">{formatearMoneda(Math.abs(grupo.totalAmount))}</span>
+                            <button className="btn-desasignar-sm" onClick={() => handleDesasignarGrupo(grupo.ids)} title="Quitar asignación">✕</button>
                           </div>
                         ))}
                       </div>
@@ -539,66 +643,90 @@ function Dashboard({ seccion = 'dashboard' }) {
                         </div>
                       )}
 
-                      <table className="sin-asignar-tabla">
-                        <thead>
-                          <tr>
-                            <th>Fecha</th>
-                            <th>Descripción</th>
-                            <th>Monto</th>
-                            <th>Asignar a</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {cat.movimientos.map((mov) => (
-                            <tr key={mov._id}>
-                              <td>{mov.postDate ? new Date(mov.postDate).toLocaleDateString('es-CL') : '-'}</td>
-                              <td>{mov.description || 'Sin descripción'}</td>
-                              <td className="sin-asignar-monto">{formatearMoneda(Math.abs(mov.amount))}</td>
-                              <td>
-                                <div className="td-asignar">
-                                  <select
-                                    className="select-obligacion"
-                                    value={seleccionAsignar[mov._id] || ''}
-                                    onChange={(e) => setSeleccionAsignar((prev) => ({ ...prev, [mov._id]: e.target.value }))}
-                                  >
-                                    <option value="">-- Seleccionar --</option>
-                                    {cat.obligacionesSugeridas?.length > 0 && (
-                                      <optgroup label="★ Sugeridas">
-                                        {cat.obligacionesSugeridas.map((o) => (
-                                          <option key={o._id} value={`${o.tipo}_${o._id}`}>
-                                            {o.nombre} ({formatearMoneda(o.monto)})
-                                          </option>
-                                        ))}
-                                      </optgroup>
-                                    )}
-                                    <optgroup label="Costos Fijos">
-                                      {obligacionesLista.filter((o) => o.tipo === 'costoFijo').map((o) => (
-                                        <option key={o._id} value={`costoFijo_${o._id}`}>
-                                          {o.nombre} ({formatearMoneda(o.monto)})
-                                        </option>
-                                      ))}
-                                    </optgroup>
-                                    <optgroup label="Deudas">
-                                      {obligacionesLista.filter((o) => o.tipo === 'deuda').map((o) => (
-                                        <option key={o._id} value={`deuda_${o._id}`}>
-                                          {o.nombre} ({formatearMoneda(o.monto)})
-                                        </option>
-                                      ))}
-                                    </optgroup>
-                                  </select>
-                                  <button
-                                    className="btn-asignar"
-                                    disabled={!seleccionAsignar[mov._id] || asignando === mov._id}
-                                    onClick={() => handleAsignar(mov._id)}
-                                  >
-                                    {asignando === mov._id ? '...' : 'Asignar'}
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                      {(() => {
+                        const gruposMap = cat.movimientos.reduce((acc, mov) => {
+                          const key = (mov.description || 'Sin descripción').trim();
+                          if (!acc[key]) acc[key] = { description: key, ids: [], totalAmount: 0, lastDate: null };
+                          acc[key].ids.push(mov._id);
+                          acc[key].totalAmount += mov.amount;
+                          const d = mov.postDate || mov.transactionDate;
+                          if (!acc[key].lastDate || new Date(d) > new Date(acc[key].lastDate)) acc[key].lastDate = d;
+                          return acc;
+                        }, {});
+                        const grupos = Object.values(gruposMap).sort((a, b) => new Date(b.lastDate) - new Date(a.lastDate));
+                        return (
+                          <table className="sin-asignar-tabla">
+                            <thead>
+                              <tr>
+                                <th>Fecha</th>
+                                <th>Descripción</th>
+                                <th>Monto</th>
+                                <th>Asignar a</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {grupos.map((grupo) => {
+                                const grupoKey = `${cat.nombre}__${grupo.description}`;
+                                return (
+                                  <tr key={grupoKey}>
+                                    <td>{grupo.lastDate ? new Date(grupo.lastDate).toLocaleDateString('es-CL') : '-'}</td>
+                                    <td>
+                                      <span>{grupo.description}</span>
+                                      {grupo.ids.length > 1 && (
+                                        <span style={{ marginLeft: '6px', fontSize: '11px', fontWeight: 600, color: '#6c6fa3', background: '#eeeef8', borderRadius: '10px', padding: '1px 7px' }}>
+                                          ×{grupo.ids.length}
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="sin-asignar-monto">{formatearMoneda(Math.abs(grupo.totalAmount))}</td>
+                                    <td>
+                                      <div className="td-asignar">
+                                        <select
+                                          className="select-obligacion"
+                                          value={seleccionAsignar[grupoKey] || ''}
+                                          onChange={(e) => setSeleccionAsignar((prev) => ({ ...prev, [grupoKey]: e.target.value }))}
+                                        >
+                                          <option value="">-- Seleccionar --</option>
+                                          {cat.obligacionesSugeridas?.length > 0 && (
+                                            <optgroup label="★ Sugeridas">
+                                              {cat.obligacionesSugeridas.map((o) => (
+                                                <option key={o._id} value={`${o.tipo}_${o._id}`}>
+                                                  {o.nombre} ({formatearMoneda(o.monto)})
+                                                </option>
+                                              ))}
+                                            </optgroup>
+                                          )}
+                                          <optgroup label="Costos Fijos">
+                                            {obligacionesLista.filter((o) => o.tipo === 'costoFijo').map((o) => (
+                                              <option key={o._id} value={`costoFijo_${o._id}`}>
+                                                {o.nombre} ({formatearMoneda(o.monto)})
+                                              </option>
+                                            ))}
+                                          </optgroup>
+                                          <optgroup label="Deudas">
+                                            {obligacionesLista.filter((o) => o.tipo === 'deuda').map((o) => (
+                                              <option key={o._id} value={`deuda_${o._id}`}>
+                                                {o.nombre} ({formatearMoneda(o.monto)})
+                                              </option>
+                                            ))}
+                                          </optgroup>
+                                        </select>
+                                        <button
+                                          className="btn-asignar"
+                                          disabled={!seleccionAsignar[grupoKey] || asignando === grupoKey}
+                                          onClick={() => handleAsignarGrupo(grupoKey, grupo.ids)}
+                                        >
+                                          {asignando === grupoKey ? '...' : 'Asignar'}
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>
@@ -766,26 +894,93 @@ function Dashboard({ seccion = 'dashboard' }) {
               </div>
             ))}
 
-            {cuentaSeleccionada && (
-              <div className="movimientos-seccion" style={{ marginTop: '24px' }}>
-                <div className="movimientos-header">
-                  <div>
-                    <div className="movimientos-titulo">Últimos movimientos</div>
-                    <div className="movimientos-cuenta-info">
-                      {cuentaSeleccionada.name || traducirTipoCuenta(cuentaSeleccionada.type)}
-                      {cuentaSeleccionada.number && ` · ****${cuentaSeleccionada.number.slice(-4)}`}
+            {cuentaSeleccionada && (() => {
+              const hace30 = new Date();
+              hace30.setDate(hace30.getDate() - 30);
+              const movsFiltrados = (cuentaSeleccionada.movements || [])
+                .filter((m) => new Date(m.postDate || m.transactionDate) >= hace30)
+                .sort((a, b) => new Date(b.postDate || b.transactionDate) - new Date(a.postDate || a.transactionDate));
+              const movsVisibles = movsFiltrados.slice(0, limiteMovs);
+              const hayMas = movsFiltrados.length > limiteMovs;
+
+              return (
+                <div className="movimientos-seccion" style={{ marginTop: '24px' }}>
+                  <div className="movimientos-header">
+                    <div>
+                      <div className="movimientos-titulo">Últimos movimientos</div>
+                      <div className="movimientos-cuenta-info">
+                        {cuentaSeleccionada.name || traducirTipoCuenta(cuentaSeleccionada.type)}
+                        {cuentaSeleccionada.number && ` · ****${cuentaSeleccionada.number.slice(-4)}`}
+                        {' · '}<span style={{ color: '#888' }}>últimos 30 días</span>
+                      </div>
                     </div>
+                    <span className="movimientos-registros">
+                      {movsFiltrados.length} movimiento{movsFiltrados.length !== 1 ? 's' : ''}
+                    </span>
                   </div>
-                  <span className="movimientos-registros">
-                    {cuentaSeleccionada.movements?.length || 0} registros
-                  </span>
+
+                  {movsFiltrados.length === 0 ? (
+                    <div className="movimientos-vacio">
+                      <p className="movimientos-vacio-texto">Sin movimientos en los últimos 30 días</p>
+                    </div>
+                  ) : (
+                    <div style={{ overflowX: 'auto' }}>
+                      <table className="movimientos-tabla">
+                        <thead>
+                          <tr>
+                            <th>Fecha</th>
+                            <th>Descripción</th>
+                            <th>Tipo</th>
+                            <th className="col-monto">Monto</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {movsVisibles.map((mov) => {
+                            const fecha = mov.postDate || mov.transactionDate;
+                            const esIngreso = mov.amount >= 0;
+                            return (
+                              <tr key={mov._id || mov.fintocId}>
+                                <td style={{ whiteSpace: 'nowrap', color: '#555a7e' }}>
+                                  {formatearFecha(fecha)}
+                                </td>
+                                <td>
+                                  <div className="movimiento-descripcion" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    {mov.description || 'Sin descripción'}
+                                    {mov.pending && (
+                                      <span style={{
+                                        fontSize: '11px', fontWeight: 600, color: '#b45309',
+                                        background: '#fff8e1', borderRadius: '6px', padding: '1px 6px'
+                                      }}>
+                                        pendiente
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td>
+                                  <span className="movimiento-tipo-badge">{mov.type || '-'}</span>
+                                </td>
+                                <td className={`movimiento-monto ${esIngreso ? 'ingreso' : 'egreso'}`}>
+                                  {esIngreso ? '+' : ''}{formatearMoneda(mov.amount, cuentaSeleccionada.currency)}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+
+                      {hayMas && (
+                        <button
+                          className="btn-ver-mas-movs"
+                          onClick={() => setLimiteMovs((prev) => prev + 30)}
+                        >
+                          Ver más ({movsFiltrados.length - limiteMovs} restantes)
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <TablaMovimientos
-                  movimientos={cuentaSeleccionada.movements || []}
-                  moneda={cuentaSeleccionada.currency}
-                />
-              </div>
-            )}
+              );
+            })()}
           </>
         ) : (
           <div className="estado-vacio">

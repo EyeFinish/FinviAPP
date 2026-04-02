@@ -10,7 +10,7 @@ if (Platform.OS !== 'web') {
   WebView = require('react-native-webview').WebView;
 }
 import { Ionicons } from '@expo/vector-icons';
-import { obtenerCuentas, obtenerMovimientos, crearLinkIntent, intercambiarToken } from '../../services/api';
+import { obtenerCuentas, obtenerMovimientos, crearLinkIntent, intercambiarToken, refrescarDatos, obtenerSyncStatus } from '../../services/api';
 import { formatearMoneda, formatearFecha, traducirTipoCuenta, obtenerInfoBanco } from '../../utils/formateadores';
 import { Colors, Spacing, FontSize, BorderRadius } from '../../constants/theme';
 
@@ -56,6 +56,7 @@ export default function Cuentas() {
   const [cuentaSeleccionada, setCuentaSeleccionada] = useState(null);
   const [movimientos, setMovimientos] = useState([]);
   const [cargandoMov, setCargandoMov] = useState(false);
+  const [limiteMovs, setLimiteMovs] = useState(15);
 
   // Estado de conexión bancaria
   const [conectando, setConectando] = useState(false); // modal abierto
@@ -76,7 +77,39 @@ export default function Cuentas() {
     }
   };
 
-  useFocusEffect(useCallback(() => { cargarCuentas(); }, []));
+  // Dispara refresh y hace polling hasta detectar datos nuevos
+  const refrescarEnSegundoPlano = async () => {
+    try {
+      let syncAntes = null;
+      try {
+        const st = await obtenerSyncStatus();
+        syncAntes = st.data?.lastSync;
+      } catch { /* silencioso */ }
+
+      refrescarDatos().catch(() => {});
+
+      let intentos = 0;
+      const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
+      while (intentos < 40) {
+        await esperar(3000);
+        try {
+          const st = await obtenerSyncStatus();
+          const syncNuevo = st.data?.lastSync;
+          if (syncNuevo && (!syncAntes || new Date(syncNuevo) > new Date(syncAntes))) {
+            await cargarCuentas();
+            return;
+          }
+          if (!st.data?.sincronizando) break;
+        } catch { /* silencioso */ }
+        intentos++;
+      }
+    } catch { /* silencioso */ }
+  };
+
+  useFocusEffect(useCallback(() => {
+    cargarCuentas();
+    refrescarEnSegundoPlano();
+  }, []));
 
   const verMovimientos = async (cuenta) => {
     if (cuentaSeleccionada?.id === cuenta.id) {
@@ -86,9 +119,18 @@ export default function Cuentas() {
     }
     setCuentaSeleccionada(cuenta);
     setCargandoMov(true);
+    setLimiteMovs(15); // resetear al cambiar de cuenta
     try {
       const res = await obtenerMovimientos(cuenta.id);
-      setMovimientos(res.data || []);
+      const data = res.data;
+      const lista = Array.isArray(data) ? data : (data?.movements || []);
+      // Filtrar últimos 30 días y ordenar por fecha descendente
+      const hace30 = new Date();
+      hace30.setDate(hace30.getDate() - 30);
+      const filtrados = lista
+        .filter((m) => new Date(m.postDate || m.transactionDate) >= hace30)
+        .sort((a, b) => new Date(b.postDate || b.transactionDate) - new Date(a.postDate || a.transactionDate));
+      setMovimientos(filtrados);
     } catch {
       setMovimientos([]);
     } finally {
@@ -223,24 +265,49 @@ export default function Cuentas() {
 
         {seleccionada && (
           <View style={styles.movContainer}>
+            <Text style={styles.movTitulo}>Últimos 30 días</Text>
             {cargandoMov ? (
               <ActivityIndicator color={Colors.primario} style={{ padding: 20 }} />
             ) : movimientos.length === 0 ? (
-              <Text style={styles.sinMov}>Sin movimientos</Text>
+              <Text style={styles.sinMov}>Sin movimientos en los últimos 30 días</Text>
             ) : (
-              movimientos.slice(0, 20).map((mov) => (
-                <View key={mov._id || mov.fintocId} style={styles.movRow}>
-                  <View style={styles.movInfo}>
-                    <Text style={styles.movDesc} numberOfLines={1}>
-                      {mov.description || 'Sin descripción'}
+              <>
+                {movimientos.slice(0, limiteMovs).map((mov) => {
+                  const fecha = mov.postDate || mov.transactionDate;
+                  const esIngreso = mov.amount >= 0;
+                  return (
+                    <View key={mov._id || mov.fintocId} style={styles.movRow}>
+                      <View style={styles.movInfo}>
+                        <Text style={styles.movDesc} numberOfLines={1}>
+                          {mov.description || 'Sin descripción'}
+                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Text style={styles.movFecha}>{formatearFecha(fecha)}</Text>
+                          {mov.pending && (
+                            <View style={styles.pendienteBadge}>
+                              <Text style={styles.pendienteTexto}>pendiente</Text>
+                            </View>
+                          )}
+                        </View>
+                      </View>
+                      <Text style={[styles.movMonto, { color: esIngreso ? Colors.exito : Colors.error }]}>
+                        {esIngreso ? '+' : ''}{formatearMoneda(mov.amount)}
+                      </Text>
+                    </View>
+                  );
+                })}
+                {movimientos.length > limiteMovs && (
+                  <TouchableOpacity
+                    style={styles.btnVerMas}
+                    onPress={() => setLimiteMovs((prev) => prev + 30)}
+                  >
+                    <Text style={styles.btnVerMasTexto}>
+                      Ver más ({movimientos.length - limiteMovs} restantes)
                     </Text>
-                    <Text style={styles.movFecha}>{formatearFecha(mov.postDate)}</Text>
-                  </View>
-                  <Text style={[styles.movMonto, { color: mov.amount >= 0 ? Colors.exito : Colors.error }]}>
-                    {mov.amount >= 0 ? '+' : ''}{formatearMoneda(mov.amount)}
-                  </Text>
-                </View>
-              ))
+                    <Ionicons name="chevron-down" size={14} color={Colors.primario} />
+                  </TouchableOpacity>
+                )}
+              </>
             )}
           </View>
         )}
@@ -417,6 +484,11 @@ const styles = StyleSheet.create({
     marginTop: -6, paddingHorizontal: Spacing.md, paddingBottom: Spacing.sm,
   },
   sinMov: { textAlign: 'center', color: Colors.textoSecundario, paddingVertical: 20 },
+  movTitulo: {
+    fontSize: FontSize.xs, fontWeight: '600', color: Colors.textoSecundario,
+    textTransform: 'uppercase', letterSpacing: 0.5,
+    paddingTop: Spacing.sm, paddingBottom: 4,
+  },
   movRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.borde,
@@ -425,6 +497,15 @@ const styles = StyleSheet.create({
   movDesc: { fontSize: FontSize.sm, color: Colors.texto },
   movFecha: { fontSize: FontSize.xs, color: Colors.textoSecundario, marginTop: 2 },
   movMonto: { fontSize: FontSize.sm, fontWeight: '700' },
+  pendienteBadge: {
+    backgroundColor: '#fff8e1', borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1,
+  },
+  pendienteTexto: { fontSize: 10, color: '#b45309', fontWeight: '600' },
+  btnVerMas: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 4, paddingVertical: 12,
+  },
+  btnVerMasTexto: { fontSize: FontSize.sm, color: Colors.primario, fontWeight: '600' },
 
   // Modal conexión
   modalContainer: { flex: 1, backgroundColor: Colors.fondo },
