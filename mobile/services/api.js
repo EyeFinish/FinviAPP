@@ -3,27 +3,7 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { getItem, deleteItem } from '../utils/storage';
 
-// Detectar IP automáticamente (funciona en cualquier red y plataforma)
-const getApiUrl = () => {
-  if (Platform.OS === 'web') {
-    // En web, usar el hostname del navegador (funciona desde PC y desde celular)
-    const host = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
-    return `http://${host}:5000/api`;
-  }
-
-  // Nativo: detectar IP desde Expo
-  const hostUri = Constants.expoConfig?.hostUri
-    || Constants.manifest?.debuggerHost
-    || Constants.manifest2?.extra?.expoGo?.debuggerHost
-    || Constants.manifest?.hostUri;
-  const ip = hostUri?.split(':')[0];
-
-  console.log('[API] hostUri:', hostUri, '→ IP:', ip);
-
-  return ip ? `http://${ip}:5000/api` : 'http://localhost:5000/api';
-};
-
-const API_URL = getApiUrl();
+const API_URL = 'https://finviapp.onrender.com/api';
 
 const api = axios.create({
   baseURL: API_URL,
@@ -66,8 +46,9 @@ export const obtenerUsuarioActual = () => api.get('/auth/me');
 export const crearLinkIntent = () => api.post('/fintoc/link-intent');
 export const intercambiarToken = (exchangeToken) => api.post('/fintoc/exchange', { exchangeToken });
 export const obtenerCuentas = () => api.get('/fintoc/accounts');
-export const obtenerMovimientos = (accountId) => api.get(`/fintoc/accounts/${accountId}/movements`);
+export const obtenerMovimientos = (accountId, limite = 500) => api.get(`/fintoc/accounts/${accountId}/movements`, { params: { limit: limite } });
 export const obtenerConexiones = () => api.get('/fintoc/links');
+export const eliminarConexion = (linkId) => api.delete(`/fintoc/links/${linkId}`);
 export const refrescarDatos = () => api.post('/fintoc/refresh');
 export const resincronizarDatos = () => api.post('/fintoc/resync');
 export const obtenerSyncStatus = () => api.get('/fintoc/sync-status');

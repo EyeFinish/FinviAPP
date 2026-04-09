@@ -6,6 +6,7 @@ const FintocLink = require('../models/FintocLink');
 const Account = require('../models/Account');
 const Movement = require('../models/Movement');
 const Credit = require('../models/Credit');
+const { calcularActualizacionError, calcularActualizacionExito } = require('../services/fintocErrorHandler');
 
 // Todas las rutas requieren autenticación
 router.use(auth);
@@ -103,7 +104,7 @@ router.post('/exchange', async (req, res) => {
           const fechaTx = movData.transaction_date ? new Date(movData.transaction_date) : null;
           return {
             updateOne: {
-              filter: { fintocId: movData.id },
+              filter: { fintocId: movData.id, user: userId }, // índice compuesto {fintocId, user}
               update: {
                 $set: {
                   user: userId,
@@ -255,6 +256,7 @@ router.get('/accounts', async (req, res) => {
           type: account.type,
           institution: account.link?.institutionName || '',
           holder: account.link?.holderName || '',
+          linkId: account.link?._id || null,
           lastSyncedAt: account.lastSyncedAt || null,
           movements: movements.map((mov) => ({
             id: mov._id,
@@ -287,7 +289,7 @@ router.get('/accounts/:accountId/movements', async (req, res) => {
       return res.status(404).json({ message: 'Cuenta no encontrada' });
     }
     const page = Math.max(1, parseInt(req.query.page) || 1);
-    const limit = Math.min(200, Math.max(1, parseInt(req.query.limit) || 100));
+    const limit = Math.min(500, Math.max(1, parseInt(req.query.limit) || 500));
     const skip = (page - 1) * limit;
 
     const [movements, total] = await Promise.all([
@@ -389,8 +391,13 @@ router.delete('/links/:linkId', async (req, res) => {
 // Mapa para evitar refreshes simultáneos por usuario
 const refreshEnProgreso = new Map();
 
+// Resultado del último sync por usuario: { movimientos, completedAt, error }
+const lastSyncResult = new Map();
+
 // Lógica de refresh extraída para ejecutarse en background
 async function ejecutarRefresh(userId, links) {
+  let totalMovimientos = 0;
+  let errorMsg = null;
   try {
     for (const link of links) {
       try {
@@ -409,7 +416,7 @@ async function ejecutarRefresh(userId, links) {
             { new: true }
           );
 
-          if (!account) return null;
+          if (!account) return 0;
 
           if (accData.type === 'credit_card' || accData.type === 'line_of_credit') {
             const cupoTotal = Math.abs(accData.balance?.limit || 0);
@@ -431,13 +438,15 @@ async function ejecutarRefresh(userId, links) {
 
           const movementsData = await fintocService.getMovements(accData.id, link.linkToken, { since: sinceDate });
 
+          console.log(`[Refresh] Cuenta ${accData.id}: ${movementsData.length} movimientos desde Fintoc (since: ${sinceDate})`);
+
           if (movementsData.length > 0) {
             const bulkOps = movementsData.map((movData) => {
               const fechaPost = movData.post_date ? new Date(movData.post_date) : null;
               const fechaTx = movData.transaction_date ? new Date(movData.transaction_date) : null;
               return {
                 updateOne: {
-                  filter: { fintocId: movData.id },
+                  filter: { fintocId: movData.id, user: userId }, // índice compuesto {fintocId, user}
                   update: {
                     $set: {
                       user: userId,
@@ -463,13 +472,28 @@ async function ejecutarRefresh(userId, links) {
           }
 
           await Account.findByIdAndUpdate(account._id, { lastSyncedAt: new Date() });
-          console.log(`[Refresh] Cuenta ${accData.id}: ${movementsData.length} movimientos (desde ${sinceDate})`);
+          return movementsData.length;
         });
 
-        await Promise.allSettled(accountPromises);
+        const results = await Promise.allSettled(accountPromises);
+        results.forEach((r) => { if (r.status === 'fulfilled' && r.value) totalMovimientos += r.value; });
+
+        // Éxito: reset contador de fallos y registrar último sync exitoso
+        await FintocLink.findByIdAndUpdate(link._id, calcularActualizacionExito());
       } catch (linkError) {
         console.error(`[Refresh] Error en link ${link._id}:`, linkError.message);
-        await FintocLink.findByIdAndUpdate(link._id, { status: 'error' });
+        errorMsg = linkError.message;
+
+        // Clasificar: solo marcar permanentemente si es error de credenciales (401/403)
+        const linkActual = await FintocLink.findById(link._id).lean() || link;
+        const actualizacion = calcularActualizacionError(linkError, linkActual);
+        await FintocLink.findByIdAndUpdate(link._id, actualizacion);
+
+        if (actualizacion.status === 'error') {
+          console.error(`[Refresh] Link ${link._id} marcado como 'error' tras ${linkActual.syncFailureCount + 1} fallos`);
+        } else {
+          console.warn(`[Refresh] Error transitorio en link ${link._id} (fallo #${actualizacion.syncFailureCount}), se reintentará`);
+        }
       }
     }
 
@@ -493,8 +517,13 @@ async function ejecutarRefresh(userId, links) {
       console.error('[Refresh] Error recalculando líneas de crédito:', lcErr.message);
     }
 
-    console.log(`[Refresh] Completado para usuario ${userId}`);
+    console.log(`[Refresh] Completado para usuario ${userId}: ${totalMovimientos} movimientos`);
   } finally {
+    lastSyncResult.set(String(userId), {
+      movimientos: totalMovimientos,
+      completedAt: new Date(),
+      error: errorMsg,
+    });
     refreshEnProgreso.delete(String(userId));
   }
 }
@@ -509,7 +538,8 @@ router.post('/refresh', async (req, res) => {
       return res.json({ message: 'Sincronización ya en progreso', status: 'running' });
     }
 
-    const links = await FintocLink.find({ user: userId, status: 'active' });
+    // Incluir links en 'error' para permitir auto-recovery (si Fintoc responde OK → se resetea a 'active')
+    const links = await FintocLink.find({ user: userId, status: { $in: ['active', 'error'] } });
     if (links.length === 0) {
       return res.status(404).json({ message: 'No hay conexiones bancarias activas' });
     }
@@ -526,115 +556,173 @@ router.post('/refresh', async (req, res) => {
   }
 });
 
-// POST /api/fintoc/resync - Eliminar TODOS los movimientos y re-sincronizar desde Fintoc
+// Lógica de resync completo ejecutada en background
+async function ejecutarResync(userId) {
+  try {
+    console.log(`[Resync] Iniciando re-sincronización completa para usuario ${userId}`);
+
+    // 1. Resetear lastSyncedAt en todas las cuentas ANTES de borrar movimientos
+    //    Así, si el proceso falla a mitad, el próximo refresh pedirá historial completo
+    await Account.updateMany({ user: userId }, { lastSyncedAt: null });
+
+    // 2. Borrar todos los movimientos del usuario
+    const deleted = await Movement.deleteMany({ user: userId });
+    console.log(`[Resync] ${deleted.deletedCount} movimientos eliminados para usuario ${userId}`);
+
+    // 3. Re-fetchear desde Fintoc reutilizando ejecutarRefresh
+    //    Como lastSyncedAt=null, usará since:'2000-01-01' (historial completo)
+    const links = await FintocLink.find({ user: userId, status: 'active' });
+    if (links.length > 0) {
+      await ejecutarRefresh(userId, links);
+    } else {
+      // Sin links activos: registrar como completado con 0 movimientos
+      lastSyncResult.set(String(userId), {
+        movimientos: 0,
+        completedAt: new Date(),
+        error: 'No hay conexiones bancarias activas',
+      });
+      refreshEnProgreso.delete(String(userId));
+    }
+
+    console.log(`[Resync] Re-sincronización completa finalizada para usuario ${userId}`);
+  } catch (err) {
+    console.error(`[Resync] Error en re-sincronización de usuario ${userId}:`, err.message);
+    lastSyncResult.set(String(userId), {
+      movimientos: 0,
+      completedAt: new Date(),
+      error: err.message,
+    });
+    refreshEnProgreso.delete(String(userId));
+  }
+}
+
+// POST /api/fintoc/resync - Re-sincronizar desde cero (async, igual que /refresh)
+// Responde inmediatamente; el proceso corre en background.
+// El cliente debe hacer polling a GET /sync-status para detectar cuando termina.
 router.post('/resync', async (req, res) => {
   try {
     const userId = req.user._id;
 
-    // 1. Eliminar todos los movimientos del usuario
-    const deleted = await Movement.deleteMany({ user: userId });
-    console.log(`Resync: ${deleted.deletedCount} movimientos eliminados para usuario ${userId}`);
-
-    // 2. Obtener links activos
-    const links = await FintocLink.find({ user: userId, status: 'active' });
-    if (links.length === 0) {
-      return res.json({ message: 'Movimientos eliminados. No hay conexiones activas para re-sincronizar.', eliminados: deleted.deletedCount, sincronizados: 0 });
+    if (refreshEnProgreso.has(String(userId))) {
+      return res.json({ message: 'Sincronización ya en progreso', status: 'running' });
     }
 
-    let totalSynced = 0;
+    // Marcar en progreso y lanzar en background sin await
+    refreshEnProgreso.set(String(userId), true);
+    ejecutarResync(userId); // sin await
 
-    for (const link of links) {
-      try {
-        const accountsData = await fintocService.getAccounts(link.linkToken);
-
-        const accountPromises = accountsData.map(async (accData) => {
-          const account = await Account.findOne({ fintocId: accData.id, user: userId });
-          if (!account) return 0;
-
-          // Actualizar balance
-          account.balance = {
-            available: accData.balance?.available || 0,
-            current: accData.balance?.current || 0,
-            limit: accData.balance?.limit || 0,
-          };
-          await account.save();
-
-          const movementsData = await fintocService.getMovements(accData.id, link.linkToken, { since: '2000-01-01' });
-
-          if (movementsData.length > 0) {
-            const bulkOps = movementsData.map((movData) => {
-              const fechaPost = movData.post_date ? new Date(movData.post_date) : null;
-              const fechaTx = movData.transaction_date ? new Date(movData.transaction_date) : null;
-              return {
-                updateOne: {
-                  filter: { fintocId: movData.id },
-                  update: {
-                    $set: {
-                      user: userId,
-                      fintocId: movData.id,
-                      amount: movData.amount || 0,
-                      description: movData.description || '',
-                      postDate: fechaPost || fechaTx || new Date(),
-                      transactionDate: fechaTx,
-                      currency: movData.currency || 'CLP',
-                      type: movData.type || '',
-                      pending: movData.pending || false,
-                      senderAccount: movData.sender_account || null,
-                      recipientAccount: movData.recipient_account || null,
-                      comment: movData.comment || '',
-                      account: account._id,
-                    },
-                  },
-                  upsert: true,
-                },
-              };
-            });
-            await Movement.bulkWrite(bulkOps, { ordered: false });
-          }
-
-          await Account.findByIdAndUpdate(account._id, { lastSyncedAt: new Date() });
-
-          return movementsData.length;
-        });
-
-        const results = await Promise.allSettled(accountPromises);
-        for (const r of results) {
-          if (r.status === 'fulfilled') totalSynced += r.value;
-        }
-      } catch (linkError) {
-        console.error(`Resync: Error con link ${link._id}:`, linkError.message);
-      }
-    }
-
-    console.log(`Resync completado: ${totalSynced} movimientos sincronizados`);
-    res.json({ message: 'Re-sincronización completada', eliminados: deleted.deletedCount, sincronizados: totalSynced });
+    res.json({ message: 'Re-sincronización iniciada', status: 'running' });
   } catch (error) {
-    console.error('Error en resync:', error.message);
-    res.status(500).json({ message: 'Error al re-sincronizar datos' });
+    console.error('Error iniciando resync:', error.message);
+    res.status(500).json({ message: 'Error al iniciar la re-sincronización' });
   }
 });
 
 // GET /api/fintoc/sync-status
 router.get('/sync-status', async (req, res) => {
   try {
-    const accounts = await Account.find({ user: req.user._id })
-      .select('_id name lastSyncedAt')
-      .lean();
+    const userId = String(req.user._id);
+    const [accounts, links] = await Promise.all([
+      Account.find({ user: req.user._id }).select('_id name lastSyncedAt').lean(),
+      FintocLink.find({ user: req.user._id }).select('institutionName holderName status lastSyncError syncFailureCount lastSuccessSync').lean(),
+    ]);
 
     const lastSync = accounts.reduce((latest, a) => {
       if (!a.lastSyncedAt) return latest;
       return !latest || a.lastSyncedAt > latest ? a.lastSyncedAt : latest;
     }, null);
 
+    const resultado = lastSyncResult.get(userId) || null;
+
+    // Detectar si alguna conexión tiene problemas
+    const hayConexionEnError = links.some((l) => l.status === 'error');
+
     res.json({
       accounts: accounts.map((a) => ({ id: a._id, name: a.name, lastSyncedAt: a.lastSyncedAt })),
       lastSync,
-      sincronizando: refreshEnProgreso.has(String(req.user._id)),
+      sincronizando: refreshEnProgreso.has(userId),
+      hayConexionEnError,
+      conexiones: links.map((l) => ({
+        id: l._id,
+        banco: l.institutionName,
+        titular: l.holderName,
+        status: l.status,
+        ultimoError: l.lastSyncError,
+        fallosConsecutivos: l.syncFailureCount || 0,
+        ultimoExito: l.lastSuccessSync,
+      })),
+      ultimoResultado: resultado
+        ? {
+            movimientos: resultado.movimientos,
+            completedAt: resultado.completedAt,
+            error: resultado.error,
+          }
+        : null,
     });
   } catch (error) {
     console.error('Error obteniendo sync status:', error.message);
     res.status(500).json({ message: 'Error al obtener estado de sincronización' });
   }
 });
+
+// GET /api/fintoc/diagnostico — Verifica el estado real de cada conexión contra la API de Fintoc
+router.get('/diagnostico', async (req, res) => {
+  try {
+    const links = await FintocLink.find({ user: req.user._id }).lean();
+    if (!links.length) {
+      return res.json({ diagnostico: [], mensaje: 'No hay conexiones bancarias registradas' });
+    }
+
+    const resultados = await Promise.all(links.map(async (link) => {
+      try {
+        const cuentas = await fintocService.getAccounts(link.linkToken);
+        const cuentasEnBD = await Account.find({ link: link._id }).select('name fintocId lastSyncedAt').lean();
+        return {
+          linkId: link._id,
+          banco: link.institutionName,
+          titular: link.holderName,
+          statusEnBD: link.status,
+          tokenValido: true,
+          cuentasEnFintoc: cuentas.length,
+          cuentasEnBD: cuentasEnBD.map((c) => ({
+            nombre: c.name,
+            fintocId: c.fintocId,
+            ultimaSync: c.lastSyncedAt,
+          })),
+          syncFailureCount: link.syncFailureCount,
+          lastSuccessSync: link.lastSuccessSync,
+          lastSyncError: link.lastSyncError,
+        };
+      } catch (err) {
+        return {
+          linkId: link._id,
+          banco: link.institutionName,
+          titular: link.holderName,
+          statusEnBD: link.status,
+          tokenValido: false,
+          errorFintoc: err.response?.data?.error?.message || err.message,
+          codigoError: err.response?.status || null,
+          syncFailureCount: link.syncFailureCount,
+          lastSyncError: link.lastSyncError,
+          accion: 'Desconecta y reconecta el banco en la app para obtener un token nuevo',
+        };
+      }
+    }));
+
+    res.json({ diagnostico: resultados });
+  } catch (error) {
+    console.error('[Diagnostico] Error:', error.message);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Exportar ejecutarRefresh para uso externo (webhook de Fintoc)
+// Recibe userId y array de links (documentos de FintocLink)
+router.ejecutarRefreshExterno = async (userId, links) => {
+  const userIdStr = String(userId);
+  if (refreshEnProgreso.has(userIdStr)) return; // ya hay un sync en curso
+  refreshEnProgreso.set(userIdStr, true);
+  await ejecutarRefresh(userId, links);
+};
 
 module.exports = router;

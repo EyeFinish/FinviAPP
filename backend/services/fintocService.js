@@ -51,20 +51,50 @@ const getMovements = async (accountId, linkToken, params = {}) => {
   const maxPages = 500; // Suficiente para historial completo
 
   while (allMovements.length < maxMovements && page <= maxPages) {
-    try {
-      const response = await fintocApi.get(`/accounts/${accountId}/movements`, {
-        params: { link_token: linkToken, per_page: perPage, page, ...params },
-        timeout: 15000, // 15s por página de movimientos
-      });
-      const data = response.data;
-      if (!Array.isArray(data) || data.length === 0) break;
-      allMovements.push(...data);
-      if (data.length < perPage) break;
-      page++;
-    } catch (err) {
-      // Si falla una página, devolver lo que se tiene hasta ahora
-      console.warn(`Página ${page} de movimientos falló para cuenta ${accountId}:`, err.message);
-      break;
+    let intentos = 0;
+    let paginaCompletada = false;
+
+    while (intentos < 2 && !paginaCompletada) {
+      try {
+        const response = await fintocApi.get(`/accounts/${accountId}/movements`, {
+          params: { link_token: linkToken, per_page: perPage, page, ...params },
+          timeout: 20000, // 20s por página (aumentado para bancos lentos)
+        });
+        const data = response.data;
+
+        // Respuesta vacía o no-array = fin legítimo del historial
+        if (!Array.isArray(data) || data.length === 0) {
+          return allMovements.slice(0, maxMovements);
+        }
+
+        allMovements.push(...data);
+        paginaCompletada = true;
+
+        // Última página: devolvemos lo que tenemos
+        if (data.length < perPage) {
+          return allMovements.slice(0, maxMovements);
+        }
+
+        page++;
+      } catch (err) {
+        // Error de autenticación: token inválido o revocado — propagar inmediatamente
+        // No reintentar ni saltar: el caller (syncScheduler/refresh) debe clasificarlo y marcar el link
+        if (err.response?.status === 401 || err.response?.status === 403) {
+          console.error(`[Fintoc] Token inválido/revocado (${err.response.status}) para cuenta ${accountId} — propagando error`);
+          throw err;
+        }
+
+        intentos++;
+        console.warn(`[Fintoc] Página ${page} falló (intento ${intentos}/2) para cuenta ${accountId}: ${err.message}`);
+
+        if (intentos >= 2) {
+          // Después de 2 intentos fallidos por error transitorio (timeout, 5xx), saltar esta página
+          console.warn(`[Fintoc] Saltando página ${page} y continuando paginación...`);
+          page++;
+          paginaCompletada = true;
+        }
+        // Si intentos < 2, reintenta inmediatamente (siguiente iteración del while interno)
+      }
     }
   }
 

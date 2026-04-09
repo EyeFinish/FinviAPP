@@ -3,13 +3,16 @@ const FintocLink = require('../models/FintocLink');
 const Account = require('../models/Account');
 const Movement = require('../models/Movement');
 const fintocService = require('./fintocService');
+const { calcularActualizacionError, calcularActualizacionExito } = require('./fintocErrorHandler');
 
 async function syncAllUsers() {
   console.log('[SyncScheduler] Iniciando sincronización automática...');
 
-  const activeLinks = await FintocLink.find({ status: 'active' }).lean();
+  // Incluir links en 'error' para permitir auto-recovery: si Fintoc responde OK,
+  // calcularActualizacionExito() los resetea automáticamente a status:'active'
+  const activeLinks = await FintocLink.find({ status: { $in: ['active', 'error'] } }).lean();
   if (!activeLinks.length) {
-    console.log('[SyncScheduler] No hay links activos para sincronizar');
+    console.log('[SyncScheduler] No hay links para sincronizar');
     return;
   }
 
@@ -49,13 +52,15 @@ async function syncAllUsers() {
 
           const movementsData = await fintocService.getMovements(accData.id, link.linkToken, { since: sinceDate });
 
+          console.log(`[SyncScheduler] Cuenta ${accData.id}: ${movementsData.length} movimientos desde Fintoc (since: ${sinceDate})`);
+
           if (movementsData.length > 0) {
             const bulkOps = movementsData.map((movData) => {
               const fechaPost = movData.post_date ? new Date(movData.post_date) : null;
               const fechaTx = movData.transaction_date ? new Date(movData.transaction_date) : null;
               return {
                 updateOne: {
-                  filter: { fintocId: movData.id },
+                  filter: { fintocId: movData.id, user: account.user }, // índice compuesto {fintocId, user}
                   update: {
                     $set: {
                       user: account.user,
@@ -85,9 +90,23 @@ async function syncAllUsers() {
         });
 
         await Promise.allSettled(accountPromises);
+
+        // Éxito: reset contador de fallos
+        await FintocLink.findByIdAndUpdate(link._id, calcularActualizacionExito());
+
       } catch (err) {
         console.error(`[SyncScheduler] Error en link ${link._id}:`, err.message);
-        await FintocLink.findByIdAndUpdate(link._id, { status: 'error' }).catch(() => {});
+
+        // Clasificar error: solo marcar permanentemente si es error de credenciales
+        // Para errores transitorios (timeout, red, 5xx): mantener activo hasta MAX fallos
+        const actualizacion = calcularActualizacionError(err, link);
+        await FintocLink.findByIdAndUpdate(link._id, actualizacion).catch(() => {});
+
+        if (actualizacion.status === 'error') {
+          console.error(`[SyncScheduler] Link ${link._id} marcado como 'error' tras ${link.syncFailureCount + 1} fallos consecutivos`);
+        } else {
+          console.warn(`[SyncScheduler] Error transitorio en link ${link._id} (fallo #${actualizacion.syncFailureCount}), se reintentará`);
+        }
       }
     }
   }
@@ -96,9 +115,9 @@ async function syncAllUsers() {
 }
 
 function iniciarSyncScheduler() {
-  // Cada hora en el minuto 0
-  cron.schedule('0 * * * *', syncAllUsers);
-  console.log('[SyncScheduler] Cron de sincronización iniciado (cada hora)');
+  // Cada 5 minutos para detectar transacciones recientes más rápido
+  cron.schedule('*/5 * * * *', syncAllUsers);
+  console.log('[SyncScheduler] Cron de sincronización iniciado (cada 5 minutos)');
 }
 
 module.exports = { iniciarSyncScheduler, syncAllUsers };
