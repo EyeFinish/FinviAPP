@@ -479,7 +479,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.lg,
     padding: 22,
     marginBottom: 16,
-    boxShadow: '0px 1px 4px rgba(0, 0, 0, 0.04)', elevation: 2,
+    boxShadow: '0px 3px 10px rgba(0, 0, 0, 0.09)', elevation: 4,
   },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 18 },
   cardTitulo: { fontSize: FontSize.md, fontWeight: '600', color: Colors.texto },
@@ -519,7 +519,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     backgroundColor: '#fff', borderRadius: BorderRadius.lg, padding: 16, marginBottom: 16,
     borderWidth: 1.5, borderColor: Colors.primario,
-    boxShadow: '0px 1px 4px rgba(0, 0, 0, 0.04)', elevation: 2,
+    boxShadow: '0px 3px 10px rgba(0, 0, 0, 0.09)', elevation: 4,
   },
   btnCerrarSesionTexto: { color: Colors.primario, fontWeight: '600', fontSize: FontSize.md },
 

@@ -1,7 +1,7 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, FlatList, RefreshControl,
-  TouchableOpacity, ActivityIndicator, Modal, Platform,
+  TouchableOpacity, ActivityIndicator, Modal, Platform, AppState,
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 
@@ -10,7 +10,7 @@ if (Platform.OS !== 'web') {
   WebView = require('react-native-webview').WebView;
 }
 import { Ionicons } from '@expo/vector-icons';
-import { obtenerCuentas, obtenerMovimientos, crearLinkIntent, intercambiarToken, refrescarDatos, obtenerSyncStatus } from '../../services/api';
+import { obtenerCuentas, obtenerMovimientos, crearLinkIntent, intercambiarToken, refrescarDatos, obtenerSyncStatus, eliminarConexion, obtenerConexiones } from '../../services/api';
 import { formatearMoneda, formatearFecha, traducirTipoCuenta, obtenerInfoBanco } from '../../utils/formateadores';
 import { Colors, Spacing, FontSize, BorderRadius } from '../../constants/theme';
 
@@ -64,11 +64,50 @@ export default function Cuentas() {
   const [widgetHtml, setWidgetHtml] = useState('');
   const [errorConexion, setErrorConexion] = useState('');
   const [resultadoSync, setResultadoSync] = useState(null);
+  const [syncMsg, setSyncMsg] = useState(null);
+  const [eliminando, setEliminando] = useState(null); // linkId en proceso
+  const [conexiones, setConexiones] = useState([]); // { _id, institutionName }
+  const [confirmModal, setConfirmModal] = useState(null); // { linkId, nombreBanco }
+  const [hayConexionEnError, setHayConexionEnError] = useState(false);
+  const lastSyncRef = useRef(null);
+  const pollRef = useRef(null);
+
+  const ejecutarDesconexion = async () => {
+    if (!confirmModal) return;
+    const { linkId } = confirmModal;
+    setConfirmModal(null);
+    setEliminando(linkId);
+    try {
+      await eliminarConexion(linkId);
+      setCuentaSeleccionada(null);
+      setMovimientos([]);
+      await cargarCuentas();
+    } catch (err) {
+      setConfirmModal({ error: err.response?.data?.message || 'No se pudo desconectar el banco' });
+    } finally {
+      setEliminando(null);
+    }
+  };
+
+  const desconectarBanco = (linkId, nombreBanco) => {
+    if (!linkId) {
+      setConfirmModal({ error: 'No se encontró la conexión bancaria. Recarga la pantalla e intenta nuevamente.' });
+      return;
+    }
+    setConfirmModal({ linkId, nombreBanco });
+  };
 
   const cargarCuentas = async () => {
     try {
-      const res = await obtenerCuentas();
-      setCuentas(res.data || []);
+      // Separamos las llamadas para que un error en conexiones no oculte las cuentas
+      const resCuentas = await obtenerCuentas();
+      setCuentas(resCuentas.data || []);
+      try {
+        const resConexiones = await obtenerConexiones();
+        setConexiones(resConexiones.data || []);
+      } catch {
+        // silencioso: conexiones no críticas para mostrar cuentas
+      }
     } catch {
       setCuentas([]);
     } finally {
@@ -84,6 +123,8 @@ export default function Cuentas() {
       try {
         const st = await obtenerSyncStatus();
         syncAntes = st.data?.lastSync;
+        lastSyncRef.current = syncAntes;
+        setHayConexionEnError(st.data?.hayConexionEnError || false);
       } catch { /* silencioso */ }
 
       refrescarDatos().catch(() => {});
@@ -99,16 +140,52 @@ export default function Cuentas() {
             await cargarCuentas();
             return;
           }
-          if (!st.data?.sincronizando) break;
         } catch { /* silencioso */ }
         intentos++;
       }
-    } catch { /* silencioso */ }
+    } catch { /* silencioso */ } finally {
+      setRefrescando(false);
+    }
   };
 
   useFocusEffect(useCallback(() => {
     cargarCuentas();
     refrescarEnSegundoPlano();
+
+    // Polling cada minuto para detectar sincronizaciones del cron
+    pollRef.current = setInterval(async () => {
+      try {
+        const status = await obtenerSyncStatus();
+        const nuevoSync = status.data?.lastSync;
+        setHayConexionEnError(status.data?.hayConexionEnError || false);
+        if (nuevoSync && lastSyncRef.current && new Date(nuevoSync) > new Date(lastSyncRef.current)) {
+          lastSyncRef.current = nuevoSync;
+          await cargarCuentas();
+          if (status.data?.ultimoResultado) {
+            const r = status.data.ultimoResultado;
+            if (r.error) {
+              setSyncMsg({ texto: `Error al sincronizar: ${r.error}`, tipo: 'error' });
+            } else if (r.movimientos > 0) {
+              setSyncMsg({ texto: `${r.movimientos} transacciones actualizadas`, tipo: 'ok' });
+              setTimeout(() => setSyncMsg(null), 8000);
+            }
+          }
+        }
+        if (!lastSyncRef.current) lastSyncRef.current = nuevoSync;
+      } catch { /* silencioso */ }
+    }, 60 * 1000);
+
+    // Sincronizar automáticamente cuando la app vuelve al primer plano
+    const appStateSub = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        refrescarEnSegundoPlano();
+      }
+    });
+
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+      appStateSub.remove();
+    };
   }, []));
 
   const verMovimientos = async (cuenta) => {
@@ -121,14 +198,11 @@ export default function Cuentas() {
     setCargandoMov(true);
     setLimiteMovs(15); // resetear al cambiar de cuenta
     try {
-      const res = await obtenerMovimientos(cuenta.id);
+      const res = await obtenerMovimientos(cuenta.id, 500);
       const data = res.data;
       const lista = Array.isArray(data) ? data : (data?.movements || []);
-      // Filtrar últimos 30 días y ordenar por fecha descendente
-      const hace30 = new Date();
-      hace30.setDate(hace30.getDate() - 30);
+      // Ordenar por fecha descendente (sin filtro de fecha — mostrar todas las transacciones)
       const filtrados = lista
-        .filter((m) => new Date(m.postDate || m.transactionDate) >= hace30)
         .sort((a, b) => new Date(b.postDate || b.transactionDate) - new Date(a.postDate || a.transactionDate));
       setMovimientos(filtrados);
     } catch {
@@ -265,11 +339,11 @@ export default function Cuentas() {
 
         {seleccionada && (
           <View style={styles.movContainer}>
-            <Text style={styles.movTitulo}>Últimos 30 días</Text>
+            <Text style={styles.movTitulo}>Transacciones</Text>
             {cargandoMov ? (
               <ActivityIndicator color={Colors.primario} style={{ padding: 20 }} />
             ) : movimientos.length === 0 ? (
-              <Text style={styles.sinMov}>Sin movimientos en los últimos 30 días</Text>
+              <Text style={styles.sinMov}>Sin transacciones registradas</Text>
             ) : (
               <>
                 {movimientos.slice(0, limiteMovs).map((mov) => {
@@ -323,6 +397,29 @@ export default function Cuentas() {
     );
   }
 
+  // Mapa institution (lowercase) → linkId desde /fintoc/links
+  const linkIdPorInstitution = new Map();
+  conexiones.forEach((con) => {
+    if (con._id) {
+      const key = (con.institutionName || '').toLowerCase().trim();
+      linkIdPorInstitution.set(key, String(con._id));
+    }
+  });
+
+  // Agrupar cuentas por banco, usando linkId de conexiones como fuente primaria
+  const gruposBancos = [];
+  const mapaGrupos = new Map();
+  cuentas.forEach((c) => {
+    const instKey = (c.institution || '').toLowerCase().trim();
+    const linkId = linkIdPorInstitution.get(instKey) || c.linkId || null;
+    const key = linkId || c.institution || 'unknown';
+    if (!mapaGrupos.has(key)) {
+      mapaGrupos.set(key, { linkId, institution: c.institution, holder: c.holder, cuentas: [] });
+      gruposBancos.push(mapaGrupos.get(key));
+    }
+    mapaGrupos.get(key).cuentas.push(c);
+  });
+
   return (
     <View style={styles.container}>
       {cuentas.length === 0 ? (
@@ -337,21 +434,133 @@ export default function Cuentas() {
         </View>
       ) : (
         <FlatList
-          data={cuentas}
-          keyExtractor={(item) => item.id}
-          renderItem={renderCuenta}
+          data={gruposBancos}
+          keyExtractor={(item) => item.linkId || item.institution}
           contentContainerStyle={{ padding: Spacing.lg, paddingBottom: 100 }}
           refreshControl={
-            <RefreshControl refreshing={refrescando} onRefresh={() => { setRefrescando(true); cargarCuentas(); }} colors={[Colors.primario]} />
+            <RefreshControl refreshing={refrescando} onRefresh={() => { setRefrescando(true); refrescarEnSegundoPlano(); }} colors={[Colors.primario]} />
           }
           ListHeaderComponent={
-            <TouchableOpacity style={styles.btnAgregar} onPress={iniciarConexion}>
-              <Ionicons name="add-circle-outline" size={18} color={Colors.primario} />
-              <Text style={styles.btnAgregarTexto}>Agregar otro banco</Text>
-            </TouchableOpacity>
+            <View>
+              {syncMsg && (
+                <View style={[styles.syncMsg, syncMsg.tipo === 'error' ? styles.syncMsgError : styles.syncMsgOk]}>
+                  <Text style={syncMsg.tipo === 'error' ? styles.syncMsgErrorText : styles.syncMsgOkText}>
+                    {syncMsg.tipo === 'error' ? '⚠ ' : '✓ '}{syncMsg.texto}
+                  </Text>
+                </View>
+              )}
+              {hayConexionEnError && (
+                <TouchableOpacity
+                  style={styles.bannerError}
+                  onPress={() => { setRefrescando(true); refrescarEnSegundoPlano(); }}
+                >
+                  <Ionicons name="warning-outline" size={16} color="#856404" />
+                  <Text style={styles.bannerErrorTexto}>
+                    Hay una conexión bancaria con problemas. Toca para intentar reconectar.
+                  </Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity style={styles.btnAgregar} onPress={iniciarConexion}>
+                <Ionicons name="add-circle-outline" size={18} color={Colors.primario} />
+                <Text style={styles.btnAgregarTexto}>Agregar otro banco</Text>
+              </TouchableOpacity>
+            </View>
           }
+          renderItem={({ item: grupo }) => {
+            const banco = obtenerInfoBanco(grupo.institution);
+            const estaEliminando = !!eliminando && eliminando === grupo.linkId;
+            return (
+              <View style={styles.grupoCard}>
+                {/* Header del banco con botón desconectar */}
+                <View style={styles.grupoHeader}>
+                  <View style={styles.grupoHeaderLeft}>
+                    <View style={[styles.bancoIconGrande, { backgroundColor: banco.colorClaro }]}>
+                      <Text style={[styles.bancoLetraGrande, { color: banco.color }]}>
+                        {banco.nombre.charAt(0)}
+                      </Text>
+                    </View>
+                    <View>
+                      <Text style={styles.grupoBancoNombre}>{banco.nombre}</Text>
+                      {grupo.holder ? <Text style={styles.grupoHolder}>{grupo.holder}</Text> : null}
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.btnDesconectar, estaEliminando && { opacity: 0.5 }]}
+                    onPress={() => desconectarBanco(grupo.linkId, banco.nombre)}
+                    disabled={estaEliminando}
+                  >
+                    {estaEliminando
+                      ? <ActivityIndicator size="small" color={Colors.error} />
+                      : <Ionicons name="unlink-outline" size={15} color={Colors.error} />
+                    }
+                    <Text style={styles.btnDesconectarTexto}>
+                      {estaEliminando ? 'Desconectando...' : 'Desconectar'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                {/* Cuentas del banco */}
+                {grupo.cuentas.map((item) => (
+                  <View key={item.id}>{renderCuenta({ item })}</View>
+                ))}
+              </View>
+            );
+          }}
         />
       )}
+
+      {/* MODAL CONFIRMACIÓN DESCONECTAR */}
+      <Modal
+        visible={!!confirmModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setConfirmModal(null)}
+      >
+        <View style={styles.confirmOverlay}>
+          <View style={styles.confirmCard}>
+            {confirmModal?.error ? (
+              <>
+                <View style={styles.confirmIconCircle}>
+                  <Ionicons name="alert-circle" size={32} color={Colors.error} />
+                </View>
+                <Text style={styles.confirmTitulo}>Error</Text>
+                <Text style={styles.confirmMensaje}>{confirmModal.error}</Text>
+                <TouchableOpacity
+                  style={[styles.confirmBtn, styles.confirmBtnPrimario]}
+                  onPress={() => setConfirmModal(null)}
+                >
+                  <Text style={styles.confirmBtnPrimarioTexto}>Entendido</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <View style={[styles.confirmIconCircle, styles.confirmIconPeligro]}>
+                  <Ionicons name="unlink-outline" size={28} color={Colors.error} />
+                </View>
+                <Text style={styles.confirmTitulo}>Desconectar banco</Text>
+                <Text style={styles.confirmBancoNombre}>{confirmModal?.nombreBanco}</Text>
+                <Text style={styles.confirmMensaje}>
+                  Se eliminarán todas las cuentas y movimientos asociados. Esta acción no se puede deshacer.
+                </Text>
+                <View style={styles.confirmBtns}>
+                  <TouchableOpacity
+                    style={[styles.confirmBtn, styles.confirmBtnCancelar]}
+                    onPress={() => setConfirmModal(null)}
+                  >
+                    <Text style={styles.confirmBtnCancelarTexto}>Cancelar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.confirmBtn, styles.confirmBtnPeligro]}
+                    onPress={ejecutarDesconexion}
+                  >
+                    <Ionicons name="trash-outline" size={15} color="#fff" />
+                    <Text style={styles.confirmBtnPeligroTexto}>Sí, desconectar</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
 
       {/* MODAL DE CONEXIÓN BANCARIA */}
       <Modal visible={conectando} animationType="slide" onRequestClose={cerrarConexion}>
@@ -457,6 +666,42 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 8,
   },
   btnConectarTexto: { color: '#fff', fontWeight: '600', fontSize: FontSize.sm },
+  syncMsg: {
+    borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 10,
+  },
+  syncMsgOk: { backgroundColor: '#f0fdf4' },
+  syncMsgError: { backgroundColor: '#fef2f2' },
+  syncMsgOkText: { fontSize: FontSize.xs, color: '#16a34a', fontWeight: '600' },
+  syncMsgErrorText: { fontSize: FontSize.xs, color: '#dc2626', fontWeight: '600' },
+  bannerError: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: '#fff3cd', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10,
+    marginBottom: 10, borderWidth: 1, borderColor: '#ffc107',
+  },
+  bannerErrorTexto: { flex: 1, fontSize: FontSize.xs, color: '#856404', fontWeight: '500' },
+  grupoCard: {
+    backgroundColor: '#fff', borderRadius: BorderRadius.md, marginBottom: 14,
+    overflow: 'hidden',
+    boxShadow: '0px 4px 14px rgba(0, 0, 0, 0.10)', elevation: 5,
+  },
+  grupoHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: Spacing.md, paddingVertical: 10,
+    backgroundColor: '#f4f5fb', borderBottomWidth: 1, borderBottomColor: Colors.borde,
+  },
+  grupoHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  bancoIconGrande: {
+    width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center',
+  },
+  bancoLetraGrande: { fontSize: 16, fontWeight: '700' },
+  grupoBancoNombre: { fontSize: FontSize.sm, fontWeight: '700', color: Colors.texto },
+  grupoHolder: { fontSize: FontSize.xs, color: Colors.textoSecundario, marginTop: 1 },
+  btnDesconectar: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8,
+    backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fecaca',
+  },
+  btnDesconectarTexto: { fontSize: FontSize.xs, color: Colors.error, fontWeight: '600' },
   btnAgregar: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: '#fff', borderRadius: BorderRadius.md, padding: Spacing.md, marginBottom: 12,
@@ -466,7 +711,7 @@ const styles = StyleSheet.create({
   cuentaCard: {
     backgroundColor: '#fff', borderRadius: BorderRadius.md, padding: Spacing.md,
     marginBottom: 10, flexDirection: 'row', alignItems: 'center',
-    boxShadow: '0px 1px 4px rgba(0, 0, 0, 0.05)', elevation: 2,
+    boxShadow: '0px 3px 10px rgba(0, 0, 0, 0.09)', elevation: 4,
   },
   cuentaCardActiva: { borderWidth: 2, borderColor: Colors.primario },
   bancoIcon: {
@@ -508,6 +753,42 @@ const styles = StyleSheet.create({
   btnVerMasTexto: { fontSize: FontSize.sm, color: Colors.primario, fontWeight: '600' },
 
   // Modal conexión
+  // Modal confirmación desconectar
+  confirmOverlay: {
+    flex: 1, backgroundColor: 'rgba(10, 10, 30, 0.55)',
+    justifyContent: 'center', alignItems: 'center', padding: Spacing.lg,
+  },
+  confirmCard: {
+    backgroundColor: '#fff', borderRadius: BorderRadius.xl,
+    padding: 28, width: '100%', maxWidth: 360, alignItems: 'center',
+    shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 20, shadowOffset: { width: 0, height: 8 },
+    elevation: 12,
+  },
+  confirmIconCircle: {
+    width: 64, height: 64, borderRadius: 32,
+    backgroundColor: '#fef2f2', justifyContent: 'center', alignItems: 'center', marginBottom: 16,
+  },
+  confirmIconPeligro: { backgroundColor: '#fef2f2' },
+  confirmTitulo: { fontSize: FontSize.lg, fontWeight: '700', color: Colors.texto, marginBottom: 4 },
+  confirmBancoNombre: {
+    fontSize: FontSize.md, fontWeight: '600', color: Colors.primario,
+    marginBottom: 10, textAlign: 'center',
+  },
+  confirmMensaje: {
+    fontSize: FontSize.sm, color: Colors.textoSecundario,
+    textAlign: 'center', lineHeight: 20, marginBottom: 24,
+  },
+  confirmBtns: { flexDirection: 'row', gap: 10, width: '100%' },
+  confirmBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, paddingVertical: 13, borderRadius: BorderRadius.md,
+  },
+  confirmBtnCancelar: { backgroundColor: Colors.fondo, borderWidth: 1, borderColor: Colors.borde },
+  confirmBtnCancelarTexto: { fontSize: FontSize.sm, fontWeight: '600', color: Colors.textoSecundario },
+  confirmBtnPeligro: { backgroundColor: Colors.error },
+  confirmBtnPeligroTexto: { fontSize: FontSize.sm, fontWeight: '700', color: '#fff' },
+  confirmBtnPrimario: { backgroundColor: Colors.primario, marginTop: 4 },
+  confirmBtnPrimarioTexto: { fontSize: FontSize.sm, fontWeight: '700', color: '#fff' },
   modalContainer: { flex: 1, backgroundColor: Colors.fondo },
   modalHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',

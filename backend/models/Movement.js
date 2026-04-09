@@ -10,7 +10,6 @@ const movementSchema = new mongoose.Schema(
     fintocId: {
       type: String,
       required: true,
-      unique: true,
     },
     amount: {
       type: Number,
@@ -92,6 +91,9 @@ const movementSchema = new mongoose.Schema(
   }
 );
 
+// Índice único compuesto: fintocId es único POR usuario (no globalmente)
+// Esto evita colisiones entre usuarios y permite upserts correctos por { fintocId, user }
+movementSchema.index({ fintocId: 1, user: 1 }, { unique: true });
 movementSchema.index({ user: 1, 'asignacion.tipo': 1, 'asignacion.referenciaId': 1, 'asignacion.mes': 1 });
 
 module.exports = mongoose.model('Movement', movementSchema);

@@ -2,7 +2,7 @@ export const Colors = {
   primario: '#1800ad',
   primarioOscuro: '#10007a',
   secundario: '#5170ff',
-  fondo: '#f8f9fe',
+  fondo: '#ffffff',
   fondoTarjeta: '#ffffff',
   texto: '#1a1a2e',
   textoSecundario: '#555a7e',

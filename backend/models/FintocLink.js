@@ -33,6 +33,18 @@ const fintocLinkSchema = new mongoose.Schema(
       enum: ['active', 'inactive', 'error'],
       default: 'active',
     },
+    syncFailureCount: {
+      type: Number,
+      default: 0,
+    },
+    lastSyncError: {
+      type: String,
+      default: null,
+    },
+    lastSuccessSync: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,

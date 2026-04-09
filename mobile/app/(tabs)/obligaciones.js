@@ -722,17 +722,17 @@ const st = StyleSheet.create({
   tabBtnTextActivo: { color: Colors.primario },
 
   metricasRow: { flexDirection: 'row', marginTop: Spacing.md },
-  metricaCard: { flex: 1, backgroundColor: '#fff', borderRadius: BorderRadius.md, padding: Spacing.md, borderLeftWidth: 4, boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.06)', elevation: 3 },
+  metricaCard: { flex: 1, backgroundColor: '#fff', borderRadius: BorderRadius.md, padding: Spacing.md, borderLeftWidth: 4, boxShadow: '0px 4px 14px rgba(0, 0, 0, 0.10)', elevation: 5 },
   metricaLabel: { fontSize: FontSize.xs, color: Colors.textoSecundario, marginTop: 6 },
   metricaValor: { fontSize: FontSize.lg, fontWeight: '800', marginTop: 4 },
 
-  riesgoCard: { backgroundColor: '#fff', borderRadius: BorderRadius.md, padding: Spacing.md, marginTop: Spacing.md, boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.06)', elevation: 3 },
+  riesgoCard: { backgroundColor: '#fff', borderRadius: BorderRadius.md, padding: Spacing.md, marginTop: Spacing.md, boxShadow: '0px 4px 14px rgba(0, 0, 0, 0.10)', elevation: 5 },
   riesgoTitulo: { fontSize: FontSize.sm, fontWeight: '600', color: Colors.textoSecundario, marginBottom: 10 },
   riesgoBarra: { height: 10, backgroundColor: '#f3f4f6', borderRadius: 5, overflow: 'hidden', marginBottom: 8 },
   riesgoBarraFill: { height: '100%', borderRadius: 5 },
   riesgoValor: { fontSize: FontSize.xxl, fontWeight: '800' },
   riesgoRow: { flexDirection: 'row', marginTop: Spacing.md },
-  riesgoBadgeCard: { flex: 1, backgroundColor: '#fff', borderRadius: BorderRadius.md, padding: Spacing.md, boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.06)', elevation: 3 },
+  riesgoBadgeCard: { flex: 1, backgroundColor: '#fff', borderRadius: BorderRadius.md, padding: Spacing.md, boxShadow: '0px 4px 14px rgba(0, 0, 0, 0.10)', elevation: 5 },
   riesgoBadgeLabel: { fontSize: FontSize.xs, color: Colors.textoSecundario, marginBottom: 8 },
   riesgoBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, alignSelf: 'flex-start' },
   riesgoBadgeText: { fontSize: FontSize.md, fontWeight: '700' },
@@ -742,7 +742,7 @@ const st = StyleSheet.create({
   empty: { alignItems: 'center', paddingVertical: 60, gap: 12 },
   emptyText: { fontSize: FontSize.md, color: Colors.textoSecundario },
 
-  listaCard: { backgroundColor: '#fff', borderRadius: BorderRadius.md, marginTop: Spacing.md, overflow: 'hidden', boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.06)', elevation: 3 },
+  listaCard: { backgroundColor: '#fff', borderRadius: BorderRadius.md, marginTop: Spacing.md, overflow: 'hidden', boxShadow: '0px 4px 14px rgba(0, 0, 0, 0.10)', elevation: 5 },
   listaItem: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
   listaItemInfo: { flex: 1 },
   listaItemNombre: { fontSize: FontSize.md, fontWeight: '600', color: Colors.texto },
@@ -753,7 +753,7 @@ const st = StyleSheet.create({
   listaTotalLabel: { fontSize: FontSize.md, fontWeight: '700', color: Colors.texto },
   listaTotalValor: { fontSize: FontSize.md, fontWeight: '800' },
 
-  deudaCard: { backgroundColor: '#fff', borderRadius: BorderRadius.md, padding: Spacing.md, marginTop: Spacing.md, boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.06)', elevation: 3 },
+  deudaCard: { backgroundColor: '#fff', borderRadius: BorderRadius.md, padding: Spacing.md, marginTop: Spacing.md, boxShadow: '0px 4px 14px rgba(0, 0, 0, 0.10)', elevation: 5 },
   deudaHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   deudaNombre: { fontSize: FontSize.lg, fontWeight: '700', color: Colors.texto },
   deudaFila: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 5, borderBottomWidth: 1, borderBottomColor: '#fafafa' },

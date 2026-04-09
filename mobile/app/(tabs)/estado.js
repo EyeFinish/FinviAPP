@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { obtenerEstadoFinanciero, resincronizarDatos, obtenerCategoriasDisponibles, categorizarMovimiento } from '../../services/api';
+import { obtenerEstadoFinanciero, resincronizarDatos, obtenerSyncStatus, obtenerCategoriasDisponibles, categorizarMovimiento } from '../../services/api';
 import { formatearMoneda, formatearFecha } from '../../utils/formateadores';
 import { Colors, Spacing, FontSize, BorderRadius } from '../../constants/theme';
 
@@ -19,17 +19,44 @@ export default function Estado() {
   const [refrescando, setRefrescando] = useState(false);
   const [vista, setVista] = useState('categoria');
   const [resyncLoading, setResyncLoading] = useState(false);
+  const [resyncError, setResyncError] = useState(null);
   const [expandido, setExpandido] = useState(null);
   const [moverItem, setMoverItem] = useState(null);
   const [catDisponibles, setCatDisponibles] = useState([]);
 
   const hacerResync = async () => {
+    setResyncError(null);
     try {
       setResyncLoading(true);
+
+      // Capturar el lastSync antes del resync para detectar cuándo terminó
+      let syncAntes = null;
+      try {
+        const st = await obtenerSyncStatus();
+        syncAntes = st.data?.lastSync;
+      } catch { /* silencioso */ }
+
+      // El backend ahora responde inmediatamente (proceso en background)
       await resincronizarDatos();
+
+      // Polling cada 3s hasta detectar que el resync terminó (max 2 minutos)
+      const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
+      for (let i = 0; i < 40; i++) {
+        await esperar(3000);
+        try {
+          const st = await obtenerSyncStatus();
+          const syncNuevo = st.data?.lastSync;
+          if (syncNuevo && (!syncAntes || new Date(syncNuevo) > new Date(syncAntes))) {
+            await cargarDatos();
+            return;
+          }
+        } catch { /* silencioso */ }
+      }
+      // Si no detectó cambio en 2 minutos, recargar de todas formas
       await cargarDatos();
-    } catch {
-      // Error silencioso, el usuario verá si los datos cambiaron
+    } catch (err) {
+      setResyncError('Error al re-sincronizar. Intenta nuevamente.');
+      setTimeout(() => setResyncError(null), 5000);
     } finally {
       setResyncLoading(false);
     }
@@ -192,6 +219,11 @@ export default function Estado() {
         )}
         <Text style={styles.resyncBtnText}>{resyncLoading ? 'Sincronizando...' : 'Re-sincronizar datos'}</Text>
       </TouchableOpacity>
+      {resyncError ? (
+        <View style={styles.resyncErrorMsg}>
+          <Text style={styles.resyncErrorText}>⚠ {resyncError}</Text>
+        </View>
+      ) : null}
 
       {resumen.cantidadMovimientos === 0 ? (
         <View style={styles.emptyContainer}>
@@ -426,13 +458,15 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.borde, backgroundColor: '#fff',
   },
   resyncBtnText: { fontSize: FontSize.xs, fontWeight: '600', color: Colors.primario },
+  resyncErrorMsg: { marginHorizontal: Spacing.lg, marginTop: 4, padding: Spacing.sm, backgroundColor: '#fff3cd', borderRadius: BorderRadius.sm, borderWidth: 1, borderColor: '#ffc107' },
+  resyncErrorText: { fontSize: FontSize.xs, color: '#856404' },
 
   // Mini cards
   row: { flexDirection: 'row', marginHorizontal: Spacing.lg, marginTop: Spacing.md },
   miniCard: {
     backgroundColor: '#fff', borderRadius: BorderRadius.md, padding: Spacing.md,
-    alignItems: 'center', elevation: 3,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.06)',
+    alignItems: 'center', elevation: 5,
+    boxShadow: '0px 4px 14px rgba(0, 0, 0, 0.10)',
   },
   miniLabel: { fontSize: FontSize.xs, color: Colors.textoSecundario, marginTop: 6 },
   miniValor: { fontSize: FontSize.md, fontWeight: '700', marginTop: 4 },
@@ -440,8 +474,8 @@ const styles = StyleSheet.create({
   // Card neto
   netoCard: {
     backgroundColor: '#fff', borderRadius: BorderRadius.md, marginHorizontal: Spacing.lg,
-    marginTop: Spacing.md, padding: Spacing.md, elevation: 3,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.06)',
+    marginTop: Spacing.md, padding: Spacing.md, elevation: 5,
+    boxShadow: '0px 4px 14px rgba(0, 0, 0, 0.10)',
   },
   netoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   netoLabel: { fontSize: FontSize.sm, color: Colors.textoSecundario },
@@ -466,8 +500,8 @@ const styles = StyleSheet.create({
   // Grupo
   grupoCard: {
     backgroundColor: '#fff', borderRadius: BorderRadius.lg, marginHorizontal: Spacing.lg,
-    marginTop: Spacing.md, padding: Spacing.md, elevation: 3,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.06)',
+    marginTop: Spacing.md, padding: Spacing.md, elevation: 5,
+    boxShadow: '0px 4px 14px rgba(0, 0, 0, 0.10)',
   },
   grupoHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: Colors.borde },
   grupoTitulo: { fontSize: FontSize.md, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
@@ -512,8 +546,8 @@ const styles = StyleSheet.create({
   // Top movimientos
   topCard: {
     backgroundColor: '#fff', borderRadius: BorderRadius.lg, marginHorizontal: Spacing.lg,
-    marginTop: Spacing.md, padding: Spacing.md, elevation: 3,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.06)',
+    marginTop: Spacing.md, padding: Spacing.md, elevation: 5,
+    boxShadow: '0px 4px 14px rgba(0, 0, 0, 0.10)',
   },
   topTitulo: { fontSize: FontSize.md, fontWeight: '700', color: Colors.texto, marginBottom: 12 },
   topItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f5f5f5' },

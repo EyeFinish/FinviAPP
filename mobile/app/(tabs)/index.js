@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, RefreshControl,
-  TouchableOpacity, ActivityIndicator, Modal, FlatList,
+  TouchableOpacity, ActivityIndicator, Modal, FlatList, AppState,
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -70,6 +70,7 @@ export default function Dashboard() {
 
   // Última sincronización
   const [lastSync, setLastSync] = useState(null);
+  const [syncMsg, setSyncMsg] = useState(null); // { texto, tipo: 'ok'|'error' }
   const pollRef = useRef(null);
   const lastSyncRef = useRef(null);
 
@@ -164,16 +165,25 @@ export default function Dashboard() {
           // Si el lastSync es más reciente, hay datos nuevos
           if (syncNuevo && (!syncAntes || new Date(syncNuevo) > new Date(syncAntes))) {
             lastSyncRef.current = syncNuevo;
+            const r = statusNuevo.data?.ultimoResultado;
+            if (r) {
+              if (r.error) {
+                setSyncMsg({ texto: `Error al sincronizar: ${r.error}`, tipo: 'error' });
+              } else if (r.movimientos > 0) {
+                setSyncMsg({ texto: `${r.movimientos} transacciones actualizadas`, tipo: 'ok' });
+                setTimeout(() => setSyncMsg(null), 8000);
+              }
+            }
             await cargarDatos();
             return; // terminamos
           }
 
-          // Si el backend ya no está sincronizando y no cambió, terminamos igual
-          if (!statusNuevo.data?.sincronizando) break;
         } catch { /* silencioso */ }
         intentos++;
       }
-    } catch { /* silencioso */ }
+    } catch { /* silencioso */ } finally {
+      setRefrescando(false);
+    }
   };
 
   useFocusEffect(
@@ -181,7 +191,7 @@ export default function Dashboard() {
       cargarDatos();
       refrescarEnSegundoPlano();
 
-      // Polling cada 5 minutos para detectar syncronizaciones del cron
+      // Polling cada minuto para detectar sincronizaciones del cron
       pollRef.current = setInterval(async () => {
         try {
           const status = await obtenerSyncStatus();
@@ -189,20 +199,37 @@ export default function Dashboard() {
           setLastSync(nuevoSync);
           if (nuevoSync && lastSyncRef.current && new Date(nuevoSync) > new Date(lastSyncRef.current)) {
             lastSyncRef.current = nuevoSync;
+            const r = status.data?.ultimoResultado;
+            if (r) {
+              if (r.error) {
+                setSyncMsg({ texto: `Error al sincronizar: ${r.error}`, tipo: 'error' });
+              } else if (r.movimientos > 0) {
+                setSyncMsg({ texto: `${r.movimientos} transacciones actualizadas`, tipo: 'ok' });
+                setTimeout(() => setSyncMsg(null), 8000);
+              }
+            }
             await cargarDatos();
           }
         } catch { /* silencioso */ }
-      }, 5 * 60 * 1000);
+      }, 60 * 1000);
+
+      // Sincronizar automáticamente cuando la app vuelve al primer plano
+      const appStateSub = AppState.addEventListener('change', (nextState) => {
+        if (nextState === 'active') {
+          refrescarEnSegundoPlano();
+        }
+      });
 
       return () => {
         if (pollRef.current) clearInterval(pollRef.current);
+        appStateSub.remove();
       };
     }, [])
   );
 
   const onRefresh = () => {
     setRefrescando(true);
-    cargarDatos();
+    refrescarEnSegundoPlano(); // dispara sync con Fintoc + recarga al terminar
   };
 
   const balanceTotal = cuentas.reduce(
@@ -305,11 +332,15 @@ export default function Dashboard() {
         <View>
           <Text style={styles.saludo}>Hola, {user?.nombre?.split(' ')[0]} 👋</Text>
           <Text style={styles.subtitulo}>Tu resumen financiero</Text>
-          {lastSync && (
+          {syncMsg ? (
+            <Text style={syncMsg.tipo === 'error' ? styles.syncMsgError : styles.syncMsgOk}>
+              {syncMsg.tipo === 'error' ? '⚠ ' : '✓ '}{syncMsg.texto}
+            </Text>
+          ) : lastSync ? (
             <Text style={styles.syncIndicador}>
               Sinc. {new Date(lastSync).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
             </Text>
-          )}
+          ) : null}
         </View>
       </View>
 
@@ -695,11 +726,13 @@ const styles = StyleSheet.create({
   saludo: { fontSize: FontSize.xl, fontWeight: '700', color: Colors.texto },
   subtitulo: { fontSize: FontSize.sm, color: Colors.textoSecundario, marginTop: 2 },
   syncIndicador: { fontSize: FontSize.xs, color: Colors.textoSecundario, marginTop: 1, opacity: 0.7 },
+  syncMsgOk: { fontSize: FontSize.xs, color: '#16a34a', fontWeight: '600', marginTop: 2 },
+  syncMsgError: { fontSize: FontSize.xs, color: '#dc2626', fontWeight: '600', marginTop: 2 },
   logoutBtn: { padding: 8 },
   card: {
     backgroundColor: '#fff', borderRadius: BorderRadius.lg, marginHorizontal: Spacing.lg,
     marginTop: Spacing.sm, padding: Spacing.md,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.06)', elevation: 3,
+    boxShadow: '0px 4px 14px rgba(0, 0, 0, 0.10)', elevation: 5,
   },
   cardTitulo: { fontSize: FontSize.md, fontWeight: '700', color: Colors.texto, marginBottom: 8 },
   saludContainer: { alignItems: 'center', justifyContent: 'center', position: 'relative' },
@@ -712,7 +745,7 @@ const styles = StyleSheet.create({
   gridItem: {
     backgroundColor: '#fff', borderRadius: BorderRadius.md, paddingVertical: 10, paddingHorizontal: 8,
     alignItems: 'center', justifyContent: 'center',
-    boxShadow: '0px 1px 4px rgba(0, 0, 0, 0.05)', elevation: 2,
+    boxShadow: '0px 3px 10px rgba(0, 0, 0, 0.09)', elevation: 4,
   },
   gridLabel: { fontSize: 10, color: Colors.textoSecundario, marginTop: 4, textAlign: 'center' },
   gridValor: { fontSize: FontSize.sm, fontWeight: '700', color: Colors.texto, marginTop: 2, textAlign: 'center' },
