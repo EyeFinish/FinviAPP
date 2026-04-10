@@ -101,6 +101,15 @@ const getMovements = async (accountId, linkToken, params = {}) => {
   return allMovements.slice(0, maxMovements);
 };
 
+const createRefreshIntent = async (accountId, linkToken) => {
+  const response = await fintocApi.post(
+    `/accounts/${accountId}/refresh_intents`,
+    {},
+    { params: { link_token: linkToken } }
+  );
+  return response.data;
+};
+
 const deleteLink = async (linkToken) => {
   const response = await fintocApi.delete('/links', {
     params: { link_token: linkToken },
@@ -114,5 +123,6 @@ module.exports = {
   getAccounts,
   getAccount,
   getMovements,
+  createRefreshIntent,
   deleteLink,
 };

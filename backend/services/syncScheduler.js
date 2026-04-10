@@ -51,6 +51,16 @@ async function syncAllUsers() {
             sinceDate = margen.toISOString().split('T')[0];
           }
 
+          // Disparar refresh_intent para que Fintoc raspe el banco y traiga datos frescos.
+          // Es fire-and-forget: el webhook account.refresh_intent.succeeded traerá los datos
+          // cuando Fintoc termine. Igual leemos el caché actual como fallback.
+          try {
+            await fintocService.createRefreshIntent(accData.id, link.linkToken);
+            console.log(`[SyncScheduler] Refresh intent creado para cuenta ${accData.id}`);
+          } catch (riErr) {
+            console.warn(`[SyncScheduler] No se pudo crear refresh intent para ${accData.id}: ${riErr.message}`);
+          }
+
           const movementsData = await fintocService.getMovements(accData.id, link.linkToken, { since: sinceDate });
 
           console.log(`[SyncScheduler] Cuenta ${accData.id}: ${movementsData.length} movimientos desde Fintoc (since: ${sinceDate})`);

@@ -2,6 +2,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, RefreshControl,
   TouchableOpacity, ActivityIndicator, Modal, FlatList, AppState,
+  Animated, Easing,
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -46,6 +47,136 @@ function IndicadorSalud({ puntaje, nivel, color }) {
     </View>
   );
 }
+
+function BannerProcesando() {
+  const rotateAnim = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.timing(rotateAnim, {
+        toValue: 1,
+        duration: 2000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    ).start();
+
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.12, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
+
+  const rotateDeg = rotateAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  return (
+    <View style={bannerStyles.container}>
+      <View style={bannerStyles.flowRow}>
+        {/* Banco */}
+        <View style={bannerStyles.circleGray}>
+          <Ionicons name="business-outline" size={22} color="#555a7e" />
+        </View>
+
+        {/* Línea izquierda */}
+        <View style={bannerStyles.line} />
+
+        {/* Ícono central animado */}
+        <Animated.View style={[bannerStyles.circlePrimary, { transform: [{ scale: pulseAnim }] }]}>
+          <Animated.View style={{ transform: [{ rotate: rotateDeg }] }}>
+            <Ionicons name="sync" size={22} color="#fff" />
+          </Animated.View>
+        </Animated.View>
+
+        {/* Línea derecha */}
+        <View style={bannerStyles.line} />
+
+        {/* App / Wallet */}
+        <View style={bannerStyles.circleGray}>
+          <Ionicons name="wallet-outline" size={22} color="#555a7e" />
+        </View>
+      </View>
+
+      <Text style={bannerStyles.texto}>Verificando tus transacciones...</Text>
+
+      <View style={bannerStyles.notifRow}>
+        <Ionicons name="notifications-outline" size={13} color="#5170ff" />
+        <Text style={bannerStyles.notifTexto}>
+          Por seguridad, nuevas transacciones toman ~1 hora en verificarse · Te avisamos al terminar
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+const bannerStyles = StyleSheet.create({
+  container: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    marginHorizontal: 24,
+    marginTop: 12,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    gap: 14,
+    boxShadow: '0px 2px 10px rgba(0, 0, 0, 0.07)',
+    elevation: 2,
+  },
+  flowRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    justifyContent: 'center',
+  },
+  circleGray: {
+    width: 52,
+    height: 52,
+    borderRadius: 999,
+    backgroundColor: '#f0f2ff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  circlePrimary: {
+    width: 56,
+    height: 56,
+    borderRadius: 999,
+    backgroundColor: '#5170ff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: '0px 4px 14px rgba(81, 112, 255, 0.4)',
+    elevation: 5,
+  },
+  line: {
+    flex: 1,
+    height: 2,
+    backgroundColor: '#d8ddf5',
+    marginHorizontal: 4,
+  },
+  texto: {
+    fontSize: 12,
+    color: '#555a7e',
+    letterSpacing: 0.2,
+  },
+  notifRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#f0f2ff',
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  notifTexto: {
+    fontSize: 11,
+    color: '#5170ff',
+    fontWeight: '500',
+  },
+});
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -566,6 +697,9 @@ export default function Dashboard() {
           ))}
         </View>
       )}
+
+      {/* ====== BANNER: FinviApp procesando transacciones ====== */}
+      <BannerProcesando />
 
       <View style={{ height: 100 }} />
 
