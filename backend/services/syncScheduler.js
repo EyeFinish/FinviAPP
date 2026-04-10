@@ -4,6 +4,7 @@ const Account = require('../models/Account');
 const Movement = require('../models/Movement');
 const fintocService = require('./fintocService');
 const { calcularActualizacionError, calcularActualizacionExito } = require('./fintocErrorHandler');
+const { enviarNotificacion } = require('./notificationService');
 
 async function syncAllUsers() {
   console.log('[SyncScheduler] Iniciando sincronización automática...');
@@ -82,8 +83,20 @@ async function syncAllUsers() {
                 },
               };
             });
-            await Movement.bulkWrite(bulkOps, { ordered: false });
-            console.log(`[SyncScheduler] Usuario ${userId} - cuenta ${accData.id}: ${movementsData.length} movimientos`);
+            const bulkResult = await Movement.bulkWrite(bulkOps, { ordered: false });
+            const nuevos = bulkResult.upsertedCount || 0;
+            console.log(`[SyncScheduler] Usuario ${userId} - cuenta ${accData.id}: ${movementsData.length} movimientos (${nuevos} nuevos)`);
+
+            if (nuevos > 0) {
+              const cuerpo = nuevos === 1
+                ? 'Se detectó 1 nueva transacción en tu cuenta bancaria.'
+                : `Se detectaron ${nuevos} nuevas transacciones en tu cuenta bancaria.`;
+              enviarNotificacion(userId, {
+                titulo: 'Nueva transacción bancaria',
+                cuerpo,
+                tipo: 'nueva_transaccion',
+              }).catch((err) => console.error('[SyncScheduler] Error enviando notificación:', err.message));
+            }
           }
 
           await Account.findByIdAndUpdate(account._id, { lastSyncedAt: new Date() });

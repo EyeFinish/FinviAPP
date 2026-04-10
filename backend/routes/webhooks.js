@@ -114,8 +114,13 @@ router.post('/fintoc', express.raw({ type: 'application/json' }), async (req, re
     if (!signature) {
       return res.status(401).json({ message: 'Firma faltante' });
     }
+    // Fintoc puede enviar la firma con prefijo "sha256=" — normalizamos
+    const rawSignature = signature.startsWith('sha256=') ? signature.slice(7) : signature;
     const expected = crypto.createHmac('sha256', secret).update(req.body).digest('hex');
-    if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) {
+    // timingSafeEqual requiere buffers del mismo largo — comparamos hex strings
+    const sigBuf = Buffer.from(rawSignature, 'hex');
+    const expBuf = Buffer.from(expected, 'hex');
+    if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {
       return res.status(401).json({ message: 'Firma inválida' });
     }
   }

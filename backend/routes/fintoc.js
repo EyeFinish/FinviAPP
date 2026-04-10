@@ -7,6 +7,7 @@ const Account = require('../models/Account');
 const Movement = require('../models/Movement');
 const Credit = require('../models/Credit');
 const { calcularActualizacionError, calcularActualizacionExito } = require('../services/fintocErrorHandler');
+const { enviarNotificacion } = require('../services/notificationService');
 
 // Todas las rutas requieren autenticación
 router.use(auth);
@@ -397,6 +398,7 @@ const lastSyncResult = new Map();
 // Lógica de refresh extraída para ejecutarse en background
 async function ejecutarRefresh(userId, links) {
   let totalMovimientos = 0;
+  let totalNuevos = 0;
   let errorMsg = null;
   try {
     for (const link of links) {
@@ -468,15 +470,22 @@ async function ejecutarRefresh(userId, links) {
                 },
               };
             });
-            await Movement.bulkWrite(bulkOps, { ordered: false });
+            const bulkResult = await Movement.bulkWrite(bulkOps, { ordered: false });
+            await Account.findByIdAndUpdate(account._id, { lastSyncedAt: new Date() });
+            return { count: movementsData.length, nuevos: bulkResult.upsertedCount || 0 };
           }
 
           await Account.findByIdAndUpdate(account._id, { lastSyncedAt: new Date() });
-          return movementsData.length;
+          return { count: 0, nuevos: 0 };
         });
 
         const results = await Promise.allSettled(accountPromises);
-        results.forEach((r) => { if (r.status === 'fulfilled' && r.value) totalMovimientos += r.value; });
+        results.forEach((r) => {
+          if (r.status === 'fulfilled' && r.value) {
+            totalMovimientos += r.value.count || 0;
+            totalNuevos += r.value.nuevos || 0;
+          }
+        });
 
         // Éxito: reset contador de fallos y registrar último sync exitoso
         await FintocLink.findByIdAndUpdate(link._id, calcularActualizacionExito());
@@ -495,6 +504,18 @@ async function ejecutarRefresh(userId, links) {
           console.warn(`[Refresh] Error transitorio en link ${link._id} (fallo #${actualizacion.syncFailureCount}), se reintentará`);
         }
       }
+    }
+
+    // Notificar al usuario si hay movimientos genuinamente nuevos
+    if (totalNuevos > 0) {
+      const cuerpo = totalNuevos === 1
+        ? 'Se detectó 1 nueva transacción en tu cuenta bancaria.'
+        : `Se detectaron ${totalNuevos} nuevas transacciones en tu cuenta bancaria.`;
+      enviarNotificacion(userId, {
+        titulo: 'Nueva transacción bancaria',
+        cuerpo,
+        tipo: 'nueva_transaccion',
+      }).catch((err) => console.error('[Refresh] Error enviando notificación:', err.message));
     }
 
     // Recalcular saldo de líneas de crédito

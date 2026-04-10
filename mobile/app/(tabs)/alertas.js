@@ -45,6 +45,7 @@ const iconoPorTipo = {
   gasto_inusual: { name: 'alert-circle', color: Colors.error },
   resumen_semanal: { name: 'bar-chart', color: Colors.primario },
   salud_baja: { name: 'heart-dislike', color: Colors.error },
+  nueva_transaccion: { name: 'swap-horizontal', color: Colors.exito },
   general: { name: 'notifications', color: Colors.secundario },
 };
 

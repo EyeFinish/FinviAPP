@@ -1,7 +1,40 @@
 import { useEffect } from 'react';
+import { Platform } from 'react-native';
 import { Stack, useSegments, useRouter } from 'expo-router';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { StatusBar } from 'expo-status-bar';
+import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
+import Constants from 'expo-constants';
+import { registrarTokenPush } from '../services/api';
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
+
+async function registrarPush() {
+  try {
+    if (!Device.isDevice) return;
+    const { status: existing } = await Notifications.getPermissionsAsync();
+    let finalStatus = existing;
+    if (existing !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+    if (finalStatus !== 'granted') return;
+    const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+    const tokenData = await Notifications.getExpoPushTokenAsync(
+      projectId ? { projectId } : undefined
+    );
+    await registrarTokenPush(tokenData.data, Platform.OS);
+  } catch {
+    // Push notifications no disponibles en este entorno
+  }
+}
 
 function RootNavigator() {
   const { user, cargando } = useAuth();
@@ -19,6 +52,9 @@ function RootNavigator() {
     } else if (user && !enTabs && segments[0] !== 'configuracion') {
       router.replace('/(tabs)');
     }
+
+    // Registrar token push en cuanto el usuario está autenticado
+    if (user) registrarPush();
   }, [user, cargando, segments]);
 
   return (

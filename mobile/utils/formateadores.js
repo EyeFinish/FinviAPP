@@ -9,6 +9,13 @@ export const formatearMoneda = (monto, moneda = 'CLP') => {
 
 export const formatearFecha = (fechaString) => {
   if (!fechaString) return '-';
+  // Extraer solo YYYY-MM-DD para evitar desplazamiento de zona horaria
+  // Fintoc devuelve "2026-04-09T00:00:00.000Z" → medianoche UTC = día anterior en Chile (UTC-4)
+  const partes = String(fechaString).substring(0, 10).split('-');
+  if (partes.length === 3) {
+    const [year, month, day] = partes;
+    return `${day}/${month}/${year}`;
+  }
   return new Intl.DateTimeFormat('es-CL', {
     day: '2-digit',
     month: '2-digit',

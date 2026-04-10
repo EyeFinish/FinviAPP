@@ -6,7 +6,7 @@ const notificationSchema = new mongoose.Schema({
   cuerpo: { type: String, required: true },
   tipo: {
     type: String,
-    enum: ['pago_proximo', 'gasto_inusual', 'resumen_semanal', 'salud_baja', 'suscripcion', 'general'],
+    enum: ['pago_proximo', 'gasto_inusual', 'resumen_semanal', 'salud_baja', 'suscripcion', 'nueva_transaccion', 'general'],
     default: 'general',
   },
   leida: { type: Boolean, default: false },
