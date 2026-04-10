@@ -2,6 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const User = require('../models/User');
 const FintocLink = require('../models/FintocLink');
+const Account = require('../models/Account');
 const { enviarNotificacion } = require('../services/notificationService');
 const { syncAllUsers } = require('../services/syncScheduler');
 const router = express.Router();
@@ -105,22 +106,29 @@ router.post('/revenuecat', express.raw({ type: 'application/json' }), async (req
 // POST /api/webhooks/fintoc
 // Notificación en tiempo real de Fintoc cuando hay nuevos movimientos.
 // Requiere configurar el webhook en el dashboard de Fintoc apuntando a esta URL.
-// Fintoc envía X-Fintoc-Signature (HMAC-SHA256) para verificar autenticidad.
+// Fintoc envía Fintoc-Signature con formato t=TIMESTAMP,v1=HMAC_SHA256 para verificar autenticidad.
 router.post('/fintoc', express.raw({ type: 'application/json' }), async (req, res) => {
   // Verificar firma HMAC si está configurada
   const secret = process.env.FINTOC_WEBHOOK_SECRET;
   if (secret) {
-    const signature = req.headers['x-fintoc-signature'];
-    if (!signature) {
+    // Header real: "Fintoc-Signature" (Node lo recibe en lowercase)
+    const sigHeader = req.headers['fintoc-signature'];
+    if (!sigHeader) {
       return res.status(401).json({ message: 'Firma faltante' });
     }
-    // Fintoc puede enviar la firma con prefijo "sha256=" — normalizamos
-    const rawSignature = signature.startsWith('sha256=') ? signature.slice(7) : signature;
-    const expected = crypto.createHmac('sha256', secret).update(req.body).digest('hex');
-    // timingSafeEqual requiere buffers del mismo largo — comparamos hex strings
-    const sigBuf = Buffer.from(rawSignature, 'hex');
+    // Parsear formato: t=TIMESTAMP,v1=HMAC_HASH
+    const parts = Object.fromEntries(sigHeader.split(',').map((p) => p.split('=')));
+    const timestamp = parts['t'];
+    const receivedHash = parts['v1'];
+    if (!timestamp || !receivedHash) {
+      return res.status(401).json({ message: 'Formato de firma inválido' });
+    }
+    // Mensaje firmado = "{timestamp}.{raw_body}" (protección contra replay attacks)
+    const signedMessage = `${timestamp}.${req.body}`;
+    const expected = crypto.createHmac('sha256', secret).update(signedMessage).digest('hex');
+    const recvBuf = Buffer.from(receivedHash, 'hex');
     const expBuf = Buffer.from(expected, 'hex');
-    if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {
+    if (recvBuf.length !== expBuf.length || !crypto.timingSafeEqual(recvBuf, expBuf)) {
       return res.status(401).json({ message: 'Firma inválida' });
     }
   }
@@ -136,20 +144,18 @@ router.post('/fintoc', express.raw({ type: 'application/json' }), async (req, re
 
     // Eventos que indican nuevos movimientos disponibles
     const eventosSync = [
-      'movements.updated',
-      'account.refresh_intent.succeeded',  // Fintoc actualizó movimientos de una cuenta
+      'account.refresh_intent.succeeded',   // cuenta terminó de refrescarse — hay datos nuevos
+      'account.refresh_intent.movements_modified', // movimientos existentes cambiaron (pending→confirmed)
+      'link.refresh_intent.succeeded',       // refresh de link completo (todas las cuentas)
     ];
 
     // Eventos que indican credenciales inválidas — marcar link como error
     const eventosError = [
       'link.credentials_changed',
-      'account.refresh_intent.rejected',   // Credenciales del link son inválidas
+      'account.refresh_intent.rejected',    // banco rechazó credenciales — necesita reconexión
     ];
 
     if (eventosSync.includes(tipo) || eventosError.includes(tipo)) {
-      // Extraer linkId del payload (Fintoc puede enviarlo en distintos campos según el evento)
-      const linkId = payload.data?.link_id || payload.data?.id || payload.link_id;
-
       const dispararSync = async (link) => {
         const fintocRoute = require('./fintoc');
         if (typeof fintocRoute.ejecutarRefreshExterno === 'function') {
@@ -159,22 +165,37 @@ router.post('/fintoc', express.raw({ type: 'application/json' }), async (req, re
         }
       };
 
-      if (linkId) {
+      // Para account.refresh_intent.* el payload trae data.refreshed_object_id = account Fintoc ID
+      const accountFintocId = payload.data?.refreshed_object_id;
+      // Para link.refresh_intent.* y link.credentials_changed el payload trae link_id
+      const linkId = payload.data?.link_id || payload.link_id;
+
+      if (accountFintocId && payload.data?.refreshed_object === 'account') {
+        // Buscar Account por fintocId → obtener FintocLink asociado
+        const account = await Account.findOne({ fintocId: accountFintocId }).lean();
+        if (account) {
+          const link = await FintocLink.findById(account.link).lean();
+          if (link) {
+            console.log(`[Webhook Fintoc] Evento "${tipo}" para cuenta ${accountFintocId} (link ${link._id})`);
+            dispararSync(link).catch((err) => console.error('[Webhook Fintoc] Error en sync:', err.message));
+          } else {
+            console.warn(`[Webhook Fintoc] Link no encontrado para cuenta ${accountFintocId}`);
+          }
+        } else {
+          console.warn(`[Webhook Fintoc] Account no encontrada para fintocId: ${accountFintocId}`);
+        }
+      } else if (linkId) {
         const link = await FintocLink.findOne({ linkId }).lean();
         if (link) {
           console.log(`[Webhook Fintoc] Evento "${tipo}" para link ${link._id} (usuario ${link.user})`);
-          dispararSync(link).catch((err) => {
-            console.error('[Webhook Fintoc] Error en sync:', err.message);
-          });
+          dispararSync(link).catch((err) => console.error('[Webhook Fintoc] Error en sync:', err.message));
         } else {
           console.warn(`[Webhook Fintoc] Link no encontrado para linkId: ${linkId}`);
         }
       } else {
-        // Sin link_id específico: sincronizar todos los usuarios
-        console.log(`[Webhook Fintoc] Sin linkId — sincronizando todos los usuarios`);
-        syncAllUsers().catch((err) => {
-          console.error('[Webhook Fintoc] Error en syncAllUsers:', err.message);
-        });
+        // Fallback: sin referencia específica — sincronizar todos
+        console.log(`[Webhook Fintoc] Sin account/link ID — sincronizando todos los usuarios`);
+        syncAllUsers().catch((err) => console.error('[Webhook Fintoc] Error en syncAllUsers:', err.message));
       }
     } else {
       console.log(`[Webhook Fintoc] Evento ignorado: ${tipo}`);

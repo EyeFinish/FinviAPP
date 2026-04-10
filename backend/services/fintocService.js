@@ -101,10 +101,13 @@ const getMovements = async (accountId, linkToken, params = {}) => {
   return allMovements.slice(0, maxMovements);
 };
 
-const createRefreshIntent = async (accountId, linkToken) => {
+const createRefreshIntent = async (linkToken, type = 'only_last') => {
+  // Refresh Intent opera a nivel de link (no por cuenta individual).
+  // POST /v1/refresh_intents con link_token como query param.
+  // Tipos: 'only_last' (cooldown 5 min) o 'historical' (cooldown 60 min).
   const response = await fintocApi.post(
-    `/accounts/${accountId}/refresh_intents`,
-    {},
+    '/refresh_intents',
+    { type },
     { params: { link_token: linkToken } }
   );
   return response.data;

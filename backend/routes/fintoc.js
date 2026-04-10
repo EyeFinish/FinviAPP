@@ -405,6 +405,15 @@ async function ejecutarRefresh(userId, links) {
       try {
         const accountsData = await fintocService.getAccounts(link.linkToken);
 
+        // Refresh intent opera a nivel de link — una sola llamada por link.
+        // Fire-and-forget: el webhook account.refresh_intent.succeeded traerá los datos frescos.
+        try {
+          await fintocService.createRefreshIntent(link.linkToken);
+          console.log(`[Refresh] Refresh intent creado para link ${link._id}`);
+        } catch (riErr) {
+          console.warn(`[Refresh] No se pudo crear refresh intent para link ${link._id}: ${riErr.message}`);
+        }
+
         const accountPromises = accountsData.map(async (accData) => {
           const account = await Account.findOneAndUpdate(
             { fintocId: accData.id },
@@ -436,14 +445,6 @@ async function ejecutarRefresh(userId, links) {
             const margen = new Date(account.lastSyncedAt);
             margen.setDate(margen.getDate() - 30);
             sinceDate = margen.toISOString().split('T')[0];
-          }
-
-          // Disparar refresh_intent para que Fintoc raspe el banco (fire-and-forget)
-          try {
-            await fintocService.createRefreshIntent(accData.id, link.linkToken);
-            console.log(`[Refresh] Refresh intent creado para cuenta ${accData.id}`);
-          } catch (riErr) {
-            console.warn(`[Refresh] No se pudo crear refresh intent para ${accData.id}: ${riErr.message}`);
           }
 
           const movementsData = await fintocService.getMovements(accData.id, link.linkToken, { since: sinceDate });
