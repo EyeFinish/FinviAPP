@@ -30,7 +30,11 @@
       "name": "FinviApp",
       "shortName": "Finvi",
       "themeColor": "#1800ad",
-      "backgroundColor": "#1800ad"
+      "backgroundColor": "#1800ad",
+      "splash": {
+        "image": "./assets/logografica.png",
+        "backgroundColor": "#1800ad"
+      }
     },
     "plugins": [
       "expo-router",
