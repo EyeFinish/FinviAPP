@@ -4,7 +4,7 @@
     "slug": "finviapp",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/logografica.png",
     "userInterfaceStyle": "light",
     "scheme": "finviapp",
     "newArchEnabled": false,
@@ -25,7 +25,12 @@
       "package": "com.finvi.app"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/logografica.png",
+      "icon": "./assets/logografica.png",
+      "name": "FinviApp",
+      "shortName": "Finvi",
+      "themeColor": "#1800ad",
+      "backgroundColor": "#1800ad"
     },
     "plugins": [
       "expo-router",
