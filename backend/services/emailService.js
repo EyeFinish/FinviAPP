@@ -1,6 +1,10 @@
 const { Resend } = require('resend');
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+if (!process.env.RESEND_API_KEY) {
+  console.warn('ADVERTENCIA: RESEND_API_KEY no configurada. Los emails no se enviarán.');
+}
+
+const resend = new Resend(process.env.RESEND_API_KEY || 'placeholder');
 
 async function enviarEmailRecuperacion(destinatario, nombre, token) {
   const scheme = process.env.APP_DEEP_LINK_SCHEME || 'finviapp';
