@@ -9,6 +9,7 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [cargando, setCargando] = useState(true);
+  const [pendienteOnboarding, setPendienteOnboarding] = useState(false);
 
   useEffect(() => {
     verificarAuth();
@@ -26,6 +27,9 @@ export function AuthProvider({ children }) {
       }
       const res = await obtenerUsuarioActual();
       setUser(res.data);
+      // Leer flag de onboarding pendiente
+      const flag = await getItem('finvi_onboarding_pending');
+      setPendienteOnboarding(flag === '1');
       // Inicializar RevenueCat SDK solo en nativo (no en web)
       if (Platform.OS !== 'web') {
         await inicializarPurchases(res.data.id);
@@ -39,13 +43,19 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const login = async (token, userData) => {
+  const marcarOnboardingCompleto = async () => {
+    await deleteItem('finvi_onboarding_pending');
+    setPendienteOnboarding(false);
+  };
+
+  const login = async (token, userData, esNuevoUsuario = false) => {
     try {
       await setItem('finvi_token', token);
       await setItem('finvi_user', JSON.stringify(userData));
     } catch {
       // Si falla el storage, el login sigue funcionando en memoria
     }
+    if (esNuevoUsuario) setPendienteOnboarding(true);
     setUser(userData);
     // Inicializar RevenueCat SDK solo en nativo
     if (Platform.OS !== 'web') {
@@ -85,7 +95,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, cargando, login, logout, actualizarUsuario, refrescarSuscripcion }}>
+    <AuthContext.Provider value={{ user, cargando, pendienteOnboarding, login, logout, actualizarUsuario, refrescarSuscripcion, marcarOnboardingCompleto }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,7 +1,9 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const User = require('../models/User');
 const auth = require('../middleware/auth');
+const { enviarEmailRecuperacion } = require('../services/emailService');
 const router = express.Router();
 
 const generarToken = (id) => {
@@ -157,6 +159,72 @@ router.delete('/cuenta', auth, async (req, res) => {
     res.json({ message: 'Cuenta eliminada correctamente' });
   } catch (err) {
     res.status(500).json({ message: 'Error al eliminar cuenta' });
+  }
+});
+
+// POST /api/auth/forgot-password — solicitar recuperación de contraseña
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ message: 'El email es requerido' });
+    }
+
+    const user = await User.findOne({ email: email.trim().toLowerCase() });
+
+    // Siempre responder igual para evitar enumeración de emails
+    const msgOk = 'Si ese email está registrado, recibirás un correo con instrucciones.';
+
+    if (!user) {
+      return res.status(200).json({ message: msgOk });
+    }
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const expira = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
+
+    user.resetPasswordToken = token;
+    user.resetPasswordExpira = expira;
+    await user.save();
+
+    await enviarEmailRecuperacion(user.email, user.nombre, token);
+
+    res.status(200).json({ message: msgOk });
+  } catch (err) {
+    console.error('Error en forgot-password:', err.message);
+    res.status(500).json({ message: 'Error al procesar la solicitud' });
+  }
+});
+
+// POST /api/auth/reset-password — restablecer contraseña con token
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { token, passwordNueva } = req.body;
+
+    if (!token || !passwordNueva) {
+      return res.status(400).json({ message: 'Token y nueva contraseña son requeridos' });
+    }
+    if (passwordNueva.length < 6) {
+      return res.status(400).json({ message: 'La contraseña debe tener al menos 6 caracteres' });
+    }
+
+    const user = await User.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpira: { $gt: new Date() },
+    }).select('+resetPasswordToken +resetPasswordExpira +password');
+
+    if (!user) {
+      return res.status(400).json({ message: 'El enlace es inválido o ha expirado. Solicita uno nuevo.' });
+    }
+
+    user.password = passwordNueva;
+    user.resetPasswordToken = null;
+    user.resetPasswordExpira = null;
+    await user.save();
+
+    res.status(200).json({ message: 'Contraseña actualizada correctamente' });
+  } catch (err) {
+    console.error('Error en reset-password:', err.message);
+    res.status(500).json({ message: 'Error al restablecer la contraseña' });
   }
 });
 

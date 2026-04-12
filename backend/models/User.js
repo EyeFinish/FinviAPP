@@ -36,6 +36,16 @@ const userSchema = new mongoose.Schema({
     fechaCancelacion:{ type: Date, default: null },
     fechaExpiracion: { type: Date, default: null },
   },
+  resetPasswordToken: {
+    type: String,
+    default: null,
+    select: false,
+  },
+  resetPasswordExpira: {
+    type: Date,
+    default: null,
+    select: false,
+  },
 }, { timestamps: true });
 
 userSchema.pre('save', async function () {

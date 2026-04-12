@@ -3,53 +3,86 @@ import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Image,
 } from 'react-native';
-import { Link, router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { registrarUsuario } from '../../services/api';
-import { useAuth } from '../../contexts/AuthContext';
-import { setItem } from '../../utils/storage';
+import { restablecerPassword } from '../../services/api';
 import { Colors, Spacing, FontSize, BorderRadius } from '../../constants/theme';
 
-export default function Registro() {
-  const { login } = useAuth();
-  const [nombre, setNombre] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+export default function ResetPassword() {
+  const { token } = useLocalSearchParams();
+  const [passwordNueva, setPasswordNueva] = useState('');
   const [confirmar, setConfirmar] = useState('');
   const [verPassword, setVerPassword] = useState(false);
   const [verConfirmar, setVerConfirmar] = useState(false);
   const [error, setError] = useState('');
+  const [exito, setExito] = useState(false);
   const [cargando, setCargando] = useState(false);
 
-  const handleRegistro = async () => {
-    if (!nombre.trim() || !email.trim() || !password || !confirmar) {
+  const handleRestablecer = async () => {
+    if (!passwordNueva || !confirmar) {
       setError('Completa todos los campos');
       return;
     }
-    if (password !== confirmar) {
+    if (passwordNueva !== confirmar) {
       setError('Las contraseñas no coinciden');
       return;
     }
-    if (password.length < 6) {
+    if (passwordNueva.length < 6) {
       setError('La contraseña debe tener al menos 6 caracteres');
       return;
     }
+    if (!token) {
+      setError('Enlace inválido. Solicita un nuevo correo de recuperación.');
+      return;
+    }
+
     setCargando(true);
     setError('');
     try {
-      const res = await registrarUsuario({
-        nombre: nombre.trim(),
-        email: email.trim().toLowerCase(),
-        password,
-      });
-      await setItem('finvi_onboarding_pending', '1');
-      await login(res.data.token, res.data.user, true);
+      await restablecerPassword({ token, passwordNueva });
+      setExito(true);
     } catch (err) {
-      setError(err.response?.data?.message || 'Error al registrarse');
+      setError(err.response?.data?.message || 'Error al restablecer la contraseña. Intenta nuevamente.');
     } finally {
       setCargando(false);
     }
   };
+
+  if (exito) {
+    return (
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+          <View style={styles.logoContainer}>
+            <View style={styles.logoCircle}>
+              <Image
+                source={require('../../Imagenes/logografica.png')}
+                style={styles.logoImg}
+                resizeMode="cover"
+              />
+            </View>
+          </View>
+          <View style={styles.card}>
+            <View style={styles.exitoIcono}>
+              <Ionicons name="checkmark-circle-outline" size={56} color={Colors.exito} />
+            </View>
+            <Text style={styles.titulo}>¡Contraseña actualizada!</Text>
+            <Text style={styles.exitoTexto}>
+              Tu contraseña fue restablecida correctamente. Ya puedes iniciar sesión con tu nueva contraseña.
+            </Text>
+            <TouchableOpacity
+              style={styles.btn}
+              onPress={() => router.replace('/(auth)/login')}
+            >
+              <Text style={styles.btnText}>Iniciar sesión</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    );
+  }
 
   return (
     <KeyboardAvoidingView
@@ -57,15 +90,23 @@ export default function Registro() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+
         <View style={styles.logoContainer}>
           <View style={styles.logoCircle}>
-            <Image source={require('../../Imagenes/logografica.png')} style={styles.logoImg} resizeMode="cover" />
+            <Image
+              source={require('../../Imagenes/logografica.png')}
+              style={styles.logoImg}
+              resizeMode="cover"
+            />
           </View>
           <Text style={styles.subtitulo}>Tu salud financiera en un solo lugar</Text>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.titulo}>Crear Cuenta</Text>
+          <Text style={styles.titulo}>Nueva contraseña</Text>
+          <Text style={styles.descripcion}>
+            Elige una contraseña segura de al menos 6 caracteres.
+          </Text>
 
           {error ? (
             <View style={styles.errorBox}>
@@ -75,39 +116,13 @@ export default function Registro() {
           ) : null}
 
           <View style={styles.inputGroup}>
-            <Ionicons name="person-outline" size={20} color={Colors.textoSecundario} style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Nombre completo"
-              placeholderTextColor="#999"
-              value={nombre}
-              onChangeText={setNombre}
-              autoCapitalize="words"
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Ionicons name="mail-outline" size={20} color={Colors.textoSecundario} style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Correo electrónico"
-              placeholderTextColor="#999"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
             <Ionicons name="lock-closed-outline" size={20} color={Colors.textoSecundario} style={styles.inputIcon} />
             <TextInput
               style={styles.input}
-              placeholder="Contraseña"
+              placeholder="Nueva contraseña"
               placeholderTextColor="#999"
-              value={password}
-              onChangeText={setPassword}
+              value={passwordNueva}
+              onChangeText={setPasswordNueva}
               secureTextEntry={!verPassword}
             />
             <TouchableOpacity onPress={() => setVerPassword(!verPassword)} style={styles.eyeBtn}>
@@ -132,30 +147,15 @@ export default function Registro() {
 
           <TouchableOpacity
             style={[styles.btn, cargando && styles.btnDisabled]}
-            onPress={handleRegistro}
+            onPress={handleRestablecer}
             disabled={cargando}
           >
             {cargando ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.btnText}>Crear Cuenta</Text>
+              <Text style={styles.btnText}>Guardar contraseña</Text>
             )}
           </TouchableOpacity>
-
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>o</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>¿Ya tienes cuenta? </Text>
-            <Link href="/(auth)/login" asChild>
-              <TouchableOpacity>
-                <Text style={styles.footerLink}>Inicia Sesión</Text>
-              </TouchableOpacity>
-            </Link>
-          </View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -179,10 +179,7 @@ const styles = StyleSheet.create({
     elevation: 12,
     marginBottom: 4,
   },
-  logoImg: {
-    width: '100%',
-    height: '100%',
-  },
+  logoImg: { width: '100%', height: '100%' },
   subtitulo: { fontSize: FontSize.md, color: Colors.textoSecundario, marginTop: 8 },
   card: {
     backgroundColor: '#fff',
@@ -196,29 +193,58 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#f0f0f0',
   },
-  titulo: { fontSize: FontSize.xl, fontWeight: '700', color: Colors.texto, textAlign: 'center', marginBottom: 20 },
+  titulo: {
+    fontSize: FontSize.xl,
+    fontWeight: '700',
+    color: Colors.texto,
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  descripcion: {
+    fontSize: FontSize.sm,
+    color: Colors.textoSecundario,
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 20,
+  },
   errorBox: {
-    flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#fef2f2',
-    borderRadius: BorderRadius.sm, padding: 12, marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#fef2f2',
+    borderRadius: BorderRadius.sm,
+    padding: 12,
+    marginBottom: 16,
   },
   errorText: { color: Colors.error, fontSize: FontSize.sm, flex: 1 },
   inputGroup: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: '#fafafa',
-    borderRadius: BorderRadius.sm, borderWidth: 1, borderColor: Colors.borde, marginBottom: 14, paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fafafa',
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: Colors.borde,
+    marginBottom: 14,
+    paddingHorizontal: 12,
   },
   inputIcon: { marginRight: 8 },
   input: { flex: 1, paddingVertical: 14, fontSize: FontSize.md, color: Colors.texto },
   eyeBtn: { padding: 4 },
   btn: {
-    backgroundColor: Colors.primario, borderRadius: BorderRadius.sm, paddingVertical: 16,
-    alignItems: 'center', marginTop: 8,
+    backgroundColor: Colors.primario,
+    borderRadius: BorderRadius.sm,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginTop: 8,
   },
   btnDisabled: { opacity: 0.7 },
   btnText: { color: '#fff', fontSize: FontSize.lg, fontWeight: '700' },
-  divider: { flexDirection: 'row', alignItems: 'center', marginVertical: 20 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: Colors.borde },
-  dividerText: { marginHorizontal: 12, color: Colors.textoSecundario, fontSize: FontSize.sm },
-  footer: { flexDirection: 'row', justifyContent: 'center' },
-  footerText: { color: Colors.textoSecundario, fontSize: FontSize.sm },
-  footerLink: { color: Colors.primario, fontSize: FontSize.sm, fontWeight: '700' },
+  exitoIcono: { alignItems: 'center', marginBottom: 16 },
+  exitoTexto: {
+    fontSize: FontSize.sm,
+    color: Colors.textoSecundario,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 24,
+  },
 });

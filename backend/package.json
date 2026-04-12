@@ -20,7 +20,8 @@
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.2.3",
     "morgan": "^1.10.1",
-    "node-cron": "^4.2.1"
+    "node-cron": "^4.2.1",
+    "resend": "^6.10.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"

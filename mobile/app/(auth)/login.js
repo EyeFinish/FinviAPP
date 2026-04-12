@@ -105,7 +105,7 @@ export default function Login() {
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.recuperarBtn}>
+          <TouchableOpacity style={styles.recuperarBtn} onPress={() => router.push('/(auth)/forgot-password')}>
             <Text style={styles.recuperarText}>¿Olvidaste tu contraseña?</Text>
           </TouchableOpacity>
 

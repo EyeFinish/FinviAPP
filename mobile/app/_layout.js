@@ -37,7 +37,7 @@ async function registrarPush() {
 }
 
 function RootNavigator() {
-  const { user, cargando } = useAuth();
+  const { user, cargando, pendienteOnboarding } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
@@ -46,21 +46,25 @@ function RootNavigator() {
 
     const enAuth = segments[0] === '(auth)';
     const enTabs = segments[0] === '(tabs)';
+    const enOnboarding = segments[0] === 'onboarding';
 
     if (!user && !enAuth) {
       router.replace('/(auth)/login');
-    } else if (user && !enTabs && segments[0] !== 'configuracion') {
+    } else if (user && pendienteOnboarding && !enOnboarding) {
+      router.replace('/onboarding');
+    } else if (user && !pendienteOnboarding && !enTabs && !enOnboarding && segments[0] !== 'configuracion') {
       router.replace('/(tabs)');
     }
 
     // Registrar token push en cuanto el usuario está autenticado
     if (user) registrarPush();
-  }, [user, cargando, segments]);
+  }, [user, cargando, pendienteOnboarding, segments]);
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="onboarding" options={{ gestureEnabled: false, animation: 'fade' }} />
       <Stack.Screen name="configuracion" options={{ presentation: 'modal' }} />
     </Stack>
   );
