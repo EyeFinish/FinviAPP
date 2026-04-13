@@ -6,15 +6,12 @@ if (!process.env.RESEND_API_KEY) {
 
 const resend = new Resend(process.env.RESEND_API_KEY || 'placeholder');
 
-async function enviarEmailRecuperacion(destinatario, nombre, token) {
-  const scheme = process.env.APP_DEEP_LINK_SCHEME || 'finviapp';
-  const resetUrl = `${scheme}://reset-password?token=${token}`;
-
+async function enviarCodigoRecuperacion(destinatario, nombre, codigo) {
   const { error } = await resend.emails.send({
     from: `Finvi <${process.env.RESEND_FROM_EMAIL}>`,
     to: destinatario,
-    subject: 'Recupera tu contraseña de Finvi',
-    html: plantillaRecuperacion(nombre, resetUrl),
+    subject: 'Tu código de verificación Finvi',
+    html: plantillaCodigo(nombre, codigo),
   });
 
   if (error) {
@@ -22,14 +19,14 @@ async function enviarEmailRecuperacion(destinatario, nombre, token) {
   }
 }
 
-function plantillaRecuperacion(nombre, resetUrl) {
+function plantillaCodigo(nombre, codigo) {
   return `
   <!DOCTYPE html>
   <html lang="es">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Recupera tu contraseña</title>
+    <title>Código de verificación</title>
   </head>
   <body style="margin:0;padding:0;background:#f4f6fb;font-family:Arial,sans-serif;">
     <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6fb;padding:40px 0;">
@@ -57,25 +54,20 @@ function plantillaRecuperacion(nombre, resetUrl) {
                 </p>
                 <p style="font-size:15px;color:#555a7e;line-height:1.6;margin:0 0 28px;">
                   Recibimos una solicitud para restablecer la contraseña de tu cuenta Finvi.
-                  Toca el botón de abajo para crear una nueva contraseña.
+                  Ingresa el siguiente código en la app para continuar:
                 </p>
 
-                <!-- CTA Button -->
-                <table cellpadding="0" cellspacing="0" style="margin:0 auto 28px;">
-                  <tr>
-                    <td align="center" style="background:#1800ad;border-radius:10px;">
-                      <a href="${resetUrl}"
-                         style="display:inline-block;padding:16px 40px;
-                                font-size:16px;font-weight:700;color:#ffffff;
-                                text-decoration:none;letter-spacing:0.2px;">
-                        Restablecer contraseña
-                      </a>
-                    </td>
-                  </tr>
-                </table>
+                <!-- Código -->
+                <div style="background:#f0f0ff;border-radius:12px;padding:28px 20px;
+                            text-align:center;margin-bottom:28px;">
+                  <p style="font-size:42px;font-weight:700;letter-spacing:14px;
+                             color:#1800ad;margin:0;font-family:monospace;">
+                    ${codigo}
+                  </p>
+                </div>
 
                 <p style="font-size:13px;color:#555a7e;line-height:1.6;margin:0 0 8px;">
-                  Este enlace expirará en <strong>1 hora</strong>.
+                  Este código expirará en <strong>15 minutos</strong>.
                 </p>
                 <p style="font-size:13px;color:#555a7e;line-height:1.6;margin:0;">
                   Si no solicitaste este cambio, puedes ignorar este correo.
@@ -102,4 +94,4 @@ function plantillaRecuperacion(nombre, resetUrl) {
   `;
 }
 
-module.exports = { enviarEmailRecuperacion };
+module.exports = { enviarCodigoRecuperacion };

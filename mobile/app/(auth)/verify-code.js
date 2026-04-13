@@ -3,30 +3,48 @@ import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Image,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { solicitarRecuperacion } from '../../services/api';
+import { verificarCodigo, solicitarRecuperacion } from '../../services/api';
 import { Colors, Spacing, FontSize, BorderRadius } from '../../constants/theme';
 
-export default function ForgotPassword() {
-  const [email, setEmail] = useState('');
+export default function VerifyCode() {
+  const { email } = useLocalSearchParams();
+  const [codigo, setCodigo] = useState('');
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(false);
+  const [reenviando, setReenviando] = useState(false);
+  const [reenviado, setReenviado] = useState(false);
 
-  const handleEnviar = async () => {
-    if (!email.trim()) {
-      setError('Ingresa tu correo electrónico');
+  const handleVerificar = async () => {
+    if (codigo.length !== 6) {
+      setError('El código debe tener 6 dígitos');
       return;
     }
     setCargando(true);
     setError('');
     try {
-      await solicitarRecuperacion({ email: email.trim().toLowerCase() });
-      router.push({ pathname: '/(auth)/verify-code', params: { email: email.trim().toLowerCase() } });
+      await verificarCodigo({ email, codigo });
+      router.push({ pathname: '/(auth)/reset-password', params: { email, codigo } });
     } catch (err) {
-      setError(err.response?.data?.message || 'Error al enviar el correo. Intenta nuevamente.');
+      setError(err.response?.data?.message || 'Código incorrecto o expirado');
     } finally {
       setCargando(false);
+    }
+  };
+
+  const handleReenviar = async () => {
+    setReenviando(true);
+    setError('');
+    setReenviado(false);
+    try {
+      await solicitarRecuperacion({ email });
+      setReenviado(true);
+      setCodigo('');
+    } catch {
+      setError('No se pudo reenviar el código. Intenta nuevamente.');
+    } finally {
+      setReenviando(false);
     }
   };
 
@@ -45,7 +63,6 @@ export default function ForgotPassword() {
               resizeMode="cover"
             />
           </View>
-          <Text style={styles.subtitulo}>Tu salud financiera en un solo lugar</Text>
         </View>
 
         <View style={styles.card}>
@@ -54,9 +71,14 @@ export default function ForgotPassword() {
             <Text style={styles.volverText}>Volver</Text>
           </TouchableOpacity>
 
-          <Text style={styles.titulo}>¿Olvidaste tu contraseña?</Text>
+          <View style={styles.iconoContainer}>
+            <Ionicons name="mail-open-outline" size={48} color={Colors.primario} />
+          </View>
+
+          <Text style={styles.titulo}>Revisa tu correo</Text>
           <Text style={styles.descripcion}>
-            Ingresa el correo de tu cuenta y te enviaremos un código de verificación para restablecerla.
+            Enviamos un código de 6 dígitos a{'\n'}
+            <Text style={styles.emailTexto}>{email}</Text>
           </Text>
 
           {error ? (
@@ -66,30 +88,48 @@ export default function ForgotPassword() {
             </View>
           ) : null}
 
+          {reenviado ? (
+            <View style={styles.exitoBox}>
+              <Ionicons name="checkmark-circle" size={18} color={Colors.exito} />
+              <Text style={styles.exitoText}>Código reenviado. Revisa tu correo.</Text>
+            </View>
+          ) : null}
+
           <View style={styles.inputGroup}>
-            <Ionicons name="mail-outline" size={20} color={Colors.textoSecundario} style={styles.inputIcon} />
+            <Ionicons name="keypad-outline" size={20} color={Colors.textoSecundario} style={styles.inputIcon} />
             <TextInput
               style={styles.input}
-              placeholder="Correo electrónico"
+              placeholder="000000"
               placeholderTextColor="#999"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
+              value={codigo}
+              onChangeText={(val) => setCodigo(val.replace(/\D/g, '').slice(0, 6))}
+              keyboardType="number-pad"
+              maxLength={6}
               autoFocus
             />
           </View>
 
           <TouchableOpacity
-            style={[styles.btn, cargando && styles.btnDisabled]}
-            onPress={handleEnviar}
-            disabled={cargando}
+            style={[styles.btn, (cargando || codigo.length !== 6) && styles.btnDisabled]}
+            onPress={handleVerificar}
+            disabled={cargando || codigo.length !== 6}
           >
             {cargando ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.btnText}>Enviar código</Text>
+              <Text style={styles.btnText}>Verificar código</Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.reenviarBtn}
+            onPress={handleReenviar}
+            disabled={reenviando}
+          >
+            {reenviando ? (
+              <ActivityIndicator size="small" color={Colors.primario} />
+            ) : (
+              <Text style={styles.reenviarText}>¿No llegó? Reenviar código</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -116,7 +156,6 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   logoImg: { width: '100%', height: '100%' },
-  subtitulo: { fontSize: FontSize.md, color: Colors.textoSecundario, marginTop: 8 },
   card: {
     backgroundColor: '#fff',
     borderRadius: BorderRadius.lg,
@@ -131,6 +170,7 @@ const styles = StyleSheet.create({
   },
   volverBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 16 },
   volverText: { color: Colors.primario, fontSize: FontSize.sm, fontWeight: '600' },
+  iconoContainer: { alignItems: 'center', marginBottom: 16 },
   titulo: {
     fontSize: FontSize.xl,
     fontWeight: '700',
@@ -143,8 +183,9 @@ const styles = StyleSheet.create({
     color: Colors.textoSecundario,
     textAlign: 'center',
     marginBottom: 20,
-    lineHeight: 20,
+    lineHeight: 22,
   },
+  emailTexto: { color: Colors.primario, fontWeight: '600' },
   errorBox: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -155,6 +196,16 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   errorText: { color: Colors.error, fontSize: FontSize.sm, flex: 1 },
+  exitoBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#f0fdf4',
+    borderRadius: BorderRadius.sm,
+    padding: 12,
+    marginBottom: 16,
+  },
+  exitoText: { color: Colors.exito, fontSize: FontSize.sm, flex: 1 },
   inputGroup: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -166,7 +217,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   inputIcon: { marginRight: 8 },
-  input: { flex: 1, paddingVertical: 14, fontSize: FontSize.md, color: Colors.texto },
+  input: {
+    flex: 1,
+    paddingVertical: 14,
+    fontSize: 28,
+    fontWeight: '700',
+    color: Colors.texto,
+    letterSpacing: 8,
+    textAlign: 'center',
+  },
   btn: {
     backgroundColor: Colors.primario,
     borderRadius: BorderRadius.sm,
@@ -174,14 +233,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 8,
   },
-  btnDisabled: { opacity: 0.7 },
+  btnDisabled: { opacity: 0.5 },
   btnText: { color: '#fff', fontSize: FontSize.lg, fontWeight: '700' },
-  exitoIcono: { alignItems: 'center', marginBottom: 16 },
-  exitoTexto: {
-    fontSize: FontSize.sm,
-    color: Colors.textoSecundario,
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 24,
-  },
+  reenviarBtn: { alignItems: 'center', marginTop: 16, paddingVertical: 4 },
+  reenviarText: { color: Colors.primario, fontSize: FontSize.sm, fontWeight: '600' },
 });

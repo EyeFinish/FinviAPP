@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const User = require('../models/User');
 const auth = require('../middleware/auth');
-const { enviarEmailRecuperacion } = require('../services/emailService');
+const { enviarCodigoRecuperacion } = require('../services/emailService');
 const router = express.Router();
 
 const generarToken = (id) => {
@@ -173,20 +173,20 @@ router.post('/forgot-password', async (req, res) => {
     const user = await User.findOne({ email: email.trim().toLowerCase() });
 
     // Siempre responder igual para evitar enumeración de emails
-    const msgOk = 'Si ese email está registrado, recibirás un correo con instrucciones.';
+    const msgOk = 'Si ese email está registrado, recibirás un código de verificación.';
 
     if (!user) {
       return res.status(200).json({ message: msgOk });
     }
 
-    const token = crypto.randomBytes(32).toString('hex');
-    const expira = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
+    const codigo = Math.floor(100000 + Math.random() * 900000).toString();
+    const expira = new Date(Date.now() + 15 * 60 * 1000); // 15 minutos
 
-    user.resetPasswordToken = token;
+    user.resetPasswordToken = codigo;
     user.resetPasswordExpira = expira;
     await user.save();
 
-    await enviarEmailRecuperacion(user.email, user.nombre, token);
+    await enviarCodigoRecuperacion(user.email, user.nombre, codigo);
 
     res.status(200).json({ message: msgOk });
   } catch (err) {
@@ -195,25 +195,49 @@ router.post('/forgot-password', async (req, res) => {
   }
 });
 
-// POST /api/auth/reset-password — restablecer contraseña con token
+// POST /api/auth/verify-code — validar código sin consumirlo
+router.post('/verify-code', async (req, res) => {
+  try {
+    const { email, codigo } = req.body;
+    if (!email || !codigo) {
+      return res.status(400).json({ message: 'Email y código son requeridos' });
+    }
+
+    const user = await User.findOne({
+      email: email.trim().toLowerCase(),
+      resetPasswordExpira: { $gt: new Date() },
+    }).select('+resetPasswordToken +resetPasswordExpira');
+
+    if (!user || user.resetPasswordToken !== codigo) {
+      return res.status(400).json({ message: 'Código incorrecto o expirado' });
+    }
+
+    res.status(200).json({ valid: true });
+  } catch (err) {
+    console.error('Error en verify-code:', err.message);
+    res.status(500).json({ message: 'Error al verificar el código' });
+  }
+});
+
+// POST /api/auth/reset-password — restablecer contraseña con código
 router.post('/reset-password', async (req, res) => {
   try {
-    const { token, passwordNueva } = req.body;
+    const { email, codigo, passwordNueva } = req.body;
 
-    if (!token || !passwordNueva) {
-      return res.status(400).json({ message: 'Token y nueva contraseña son requeridos' });
+    if (!email || !codigo || !passwordNueva) {
+      return res.status(400).json({ message: 'Email, código y nueva contraseña son requeridos' });
     }
     if (passwordNueva.length < 6) {
       return res.status(400).json({ message: 'La contraseña debe tener al menos 6 caracteres' });
     }
 
     const user = await User.findOne({
-      resetPasswordToken: token,
+      email: email.trim().toLowerCase(),
       resetPasswordExpira: { $gt: new Date() },
     }).select('+resetPasswordToken +resetPasswordExpira +password');
 
-    if (!user) {
-      return res.status(400).json({ message: 'El enlace es inválido o ha expirado. Solicita uno nuevo.' });
+    if (!user || user.resetPasswordToken !== codigo) {
+      return res.status(400).json({ message: 'El código es inválido o ha expirado. Solicita uno nuevo.' });
     }
 
     user.password = passwordNueva;

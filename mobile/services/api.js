@@ -42,6 +42,7 @@ export const registrarUsuario = (datos) => api.post('/auth/registro', datos);
 export const loginUsuario = (datos) => api.post('/auth/login', datos);
 export const obtenerUsuarioActual = () => api.get('/auth/me');
 export const solicitarRecuperacion = (datos) => api.post('/auth/forgot-password', datos);
+export const verificarCodigo = (datos) => api.post('/auth/verify-code', datos);
 export const restablecerPassword = (datos) => api.post('/auth/reset-password', datos);
 
 // ============ FINTOC / CUENTAS ============

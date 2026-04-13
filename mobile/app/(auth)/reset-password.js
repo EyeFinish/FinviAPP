@@ -9,7 +9,7 @@ import { restablecerPassword } from '../../services/api';
 import { Colors, Spacing, FontSize, BorderRadius } from '../../constants/theme';
 
 export default function ResetPassword() {
-  const { token } = useLocalSearchParams();
+  const { email, codigo } = useLocalSearchParams();
   const [passwordNueva, setPasswordNueva] = useState('');
   const [confirmar, setConfirmar] = useState('');
   const [verPassword, setVerPassword] = useState(false);
@@ -31,15 +31,15 @@ export default function ResetPassword() {
       setError('La contraseña debe tener al menos 6 caracteres');
       return;
     }
-    if (!token) {
-      setError('Enlace inválido. Solicita un nuevo correo de recuperación.');
+    if (!email || !codigo) {
+      setError('Sesión inválida. Solicita un nuevo código de recuperación.');
       return;
     }
 
     setCargando(true);
     setError('');
     try {
-      await restablecerPassword({ token, passwordNueva });
+      await restablecerPassword({ email, codigo, passwordNueva });
       setExito(true);
     } catch (err) {
       setError(err.response?.data?.message || 'Error al restablecer la contraseña. Intenta nuevamente.');
