@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Image,
@@ -8,17 +8,38 @@ import { Ionicons } from '@expo/vector-icons';
 import { verificarCodigo, solicitarRecuperacion } from '../../services/api';
 import { Colors, Spacing, FontSize, BorderRadius } from '../../constants/theme';
 
+const LARGO = 6;
+
 export default function VerifyCode() {
   const { email } = useLocalSearchParams();
-  const [codigo, setCodigo] = useState('');
+  const [digitos, setDigitos] = useState(Array(LARGO).fill(''));
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(false);
   const [reenviando, setReenviando] = useState(false);
   const [reenviado, setReenviado] = useState(false);
+  const inputs = useRef([]);
+
+  const codigo = digitos.join('');
+
+  const handleCambio = (texto, index) => {
+    const val = texto.replace(/\D/g, '').slice(-1);
+    const nuevo = [...digitos];
+    nuevo[index] = val;
+    setDigitos(nuevo);
+    if (val && index < LARGO - 1) {
+      inputs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleKeyPress = (e, index) => {
+    if (e.nativeEvent.key === 'Backspace' && !digitos[index] && index > 0) {
+      inputs.current[index - 1]?.focus();
+    }
+  };
 
   const handleVerificar = async () => {
-    if (codigo.length !== 6) {
-      setError('El código debe tener 6 dígitos');
+    if (codigo.length !== LARGO) {
+      setError('Ingresa los 6 dígitos del código');
       return;
     }
     setCargando(true);
@@ -28,6 +49,8 @@ export default function VerifyCode() {
       router.push({ pathname: '/(auth)/reset-password', params: { email, codigo } });
     } catch (err) {
       setError(err.response?.data?.message || 'Código incorrecto o expirado');
+      setDigitos(Array(LARGO).fill(''));
+      inputs.current[0]?.focus();
     } finally {
       setCargando(false);
     }
@@ -40,7 +63,8 @@ export default function VerifyCode() {
     try {
       await solicitarRecuperacion({ email });
       setReenviado(true);
-      setCodigo('');
+      setDigitos(Array(LARGO).fill(''));
+      inputs.current[0]?.focus();
     } catch {
       setError('No se pudo reenviar el código. Intenta nuevamente.');
     } finally {
@@ -95,24 +119,28 @@ export default function VerifyCode() {
             </View>
           ) : null}
 
-          <View style={styles.inputGroup}>
-            <Ionicons name="keypad-outline" size={20} color={Colors.textoSecundario} style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="000000"
-              placeholderTextColor="#999"
-              value={codigo}
-              onChangeText={(val) => setCodigo(val.replace(/\D/g, '').slice(0, 6))}
-              keyboardType="number-pad"
-              maxLength={6}
-              autoFocus
-            />
+          {/* Cajas OTP */}
+          <View style={styles.otpRow}>
+            {digitos.map((d, i) => (
+              <TextInput
+                key={i}
+                ref={(r) => (inputs.current[i] = r)}
+                style={[styles.otpCaja, d ? styles.otpCajaLlena : null]}
+                value={d}
+                onChangeText={(t) => handleCambio(t, i)}
+                onKeyPress={(e) => handleKeyPress(e, i)}
+                keyboardType="number-pad"
+                maxLength={1}
+                autoFocus={i === 0}
+                selectTextOnFocus
+              />
+            ))}
           </View>
 
           <TouchableOpacity
-            style={[styles.btn, (cargando || codigo.length !== 6) && styles.btnDisabled]}
+            style={[styles.btn, (cargando || codigo.length !== LARGO) && styles.btnDisabled]}
             onPress={handleVerificar}
-            disabled={cargando || codigo.length !== 6}
+            disabled={cargando || codigo.length !== LARGO}
           >
             {cargando ? (
               <ActivityIndicator color="#fff" />
@@ -206,32 +234,34 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   exitoText: { color: Colors.exito, fontSize: FontSize.sm, flex: 1 },
-  inputGroup: {
+  otpRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fafafa',
-    borderRadius: BorderRadius.sm,
-    borderWidth: 1,
-    borderColor: Colors.borde,
-    marginBottom: 14,
-    paddingHorizontal: 12,
+    justifyContent: 'space-between',
+    marginBottom: 20,
+    gap: 8,
   },
-  inputIcon: { marginRight: 8 },
-  input: {
+  otpCaja: {
     flex: 1,
-    paddingVertical: 14,
-    fontSize: 28,
+    aspectRatio: 1,
+    borderWidth: 1.5,
+    borderColor: Colors.borde,
+    borderRadius: BorderRadius.sm,
+    backgroundColor: '#fafafa',
+    fontSize: 24,
     fontWeight: '700',
     color: Colors.texto,
-    letterSpacing: 8,
     textAlign: 'center',
+  },
+  otpCajaLlena: {
+    borderColor: Colors.primario,
+    backgroundColor: '#f0f0ff',
   },
   btn: {
     backgroundColor: Colors.primario,
     borderRadius: BorderRadius.sm,
     paddingVertical: 16,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 4,
   },
   btnDisabled: { opacity: 0.5 },
   btnText: { color: '#fff', fontSize: FontSize.lg, fontWeight: '700' },
