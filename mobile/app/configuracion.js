@@ -16,7 +16,7 @@ const FAQ = [
   { q: '¿Mis datos bancarios están seguros?', r: 'Sí. No almacenamos tus credenciales bancarias, solo la información de tus movimientos a través de Fintoc.' },
   { q: '¿Cómo se categorizan mis gastos?', r: 'Los gastos se categorizan automáticamente por el nombre del comercio. Puedes reasignar los que queden en "Otros".' },
   { q: '¿Qué es el estado financiero?', r: 'Un resumen mensual de ingresos y gastos organizados por categoría.' },
-  { q: '¿Cómo registro una obligación financiera?', r: 'En "Obligaciones" puedes agregar ingresos fijos, costos fijos y deudas con su tabla de amortización.' },
+  { q: '¿Cómo registro una obligación financiera?', r: 'En "Obligaciones" puedes agregar ingresos fijos, gastos fijos y deudas con su tabla de amortización.' },
 ];
 
 export default function Configuracion() {

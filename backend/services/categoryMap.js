@@ -1,4 +1,4 @@
-// Mapa de cruce entre categorías de movimientos (categorizador) y categorías de obligaciones (costos fijos / ingresos)
+// Mapa de cruce entre categorías de movimientos (categorizador) y categorías de obligaciones (gastos fijos / ingresos)
 
 /**
  * Cada clave es el nombre exacto de la categoría del categorizador (categorizador.js).

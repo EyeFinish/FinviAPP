@@ -42,9 +42,9 @@ const SLIDE_CONFIG = {
     iconName: 'trending-down-outline',
     iconColor: Colors.advertencia,
     iconBg: '#fef3c7',
-    titulo: 'Costos fijos',
+    titulo: 'Gastos fijos',
     subtitulo: '¿Cuánto gastas cada mes? Registra tus compromisos recurrentes.',
-    addLabel: '+ Agregar costo fijo',
+    addLabel: '+ Agregar gasto fijo',
     tipo: 'costo',
   },
   deudas: {
@@ -101,7 +101,7 @@ function SlideBienvenida({ onSiguiente }) {
         <View style={styles.pasosList}>
           {[
             { icon: 'cash-outline', color: Colors.exito, bg: '#d1fae5', label: 'Registra tus ingresos' },
-            { icon: 'trending-down-outline', color: Colors.advertencia, bg: '#fef3c7', label: 'Agrega tus costos fijos' },
+            { icon: 'trending-down-outline', color: Colors.advertencia, bg: '#fef3c7', label: 'Agrega tus gastos fijos' },
             { icon: 'card-outline', color: Colors.error, bg: '#fee2e2', label: 'Declara tus deudas' },
           ].map((p, i) => (
             <View key={i} style={styles.pasoItem}>
@@ -205,7 +205,7 @@ function SlideCompletado({ ingresos, costos, deudas, onFinalizar, guardando }) {
                 iconName="trending-down"
                 iconColor={Colors.advertencia}
                 iconBg="#fef3c7"
-                label="Costos fijos"
+                label="Gastos fijos"
                 count={costos.length}
                 singular="compromiso"
                 plural="compromisos"

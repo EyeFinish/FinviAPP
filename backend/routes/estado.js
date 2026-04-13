@@ -32,11 +32,14 @@ function esTransferenciaInterna(mov, numeroCuentas) {
   // Verificar si la cuenta destino u origen es una cuenta propia
   const senderNum = typeof sender === 'object' && sender ? (sender.number || sender.id || '') : String(sender || '');
   const recipientNum = typeof recipient === 'object' && recipient ? (recipient.number || recipient.id || '') : String(recipient || '');
+  let senderEsPropio = false;
+  let recipientEsPropio = false;
   for (const num of numeroCuentas) {
     if (!num) continue;
-    if (senderNum.includes(num) || recipientNum.includes(num)) return true;
+    if (senderNum && senderNum.includes(num)) senderEsPropio = true;
+    if (recipientNum && recipientNum.includes(num)) recipientEsPropio = true;
   }
-  return false;
+  return senderEsPropio && recipientEsPropio;
 }
 
 // GET /api/estado?mes=2026-03
@@ -54,8 +57,8 @@ router.get('/', async (req, res) => {
       mes = ahora.getMonth() + 1;
     }
 
-    const inicioMes = new Date(anio, mes - 1, 1);
-    const finMes = new Date(anio, mes, 1);
+    const inicioMes = new Date(Date.UTC(anio, mes - 1, 1));
+    const finMes = new Date(Date.UTC(anio, mes, 1));
     const mesKey = `${anio}-${String(mes).padStart(2, '0')}`;
     const mesLabel = inicioMes.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' });
 

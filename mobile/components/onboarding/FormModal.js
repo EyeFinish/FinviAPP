@@ -208,7 +208,7 @@ function FormDeuda({ onGuardar, onCancelar, error }) {
 export default function FormModal({ visible, tipo, onGuardar, onCerrar, error }) {
   const titulos = {
     ingreso: 'Agregar ingreso',
-    costo: 'Agregar costo fijo',
+    costo: 'Agregar gasto fijo',
     deuda: 'Agregar deuda',
   };
 

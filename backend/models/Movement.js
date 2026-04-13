@@ -69,7 +69,7 @@ const movementSchema = new mongoose.Schema(
       enum: ['alta', 'media', 'baja', null],
       default: null,
     },
-    // --- Asignación a obligaciones (costos fijos / deudas) ---
+    // --- Asignación a obligaciones (gastos fijos / deudas) ---
     asignacion: {
       tipo: {
         type: String,

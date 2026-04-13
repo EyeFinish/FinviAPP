@@ -283,7 +283,7 @@ export default function Obligaciones() {
               <View style={{ width: 10 }} />
               <View style={[st.metricaCard, { borderLeftColor: Colors.error }]}>
                 <Ionicons name="trending-down" size={20} color={Colors.error} />
-                <Text style={st.metricaLabel}>Costos fijos</Text>
+                <Text style={st.metricaLabel}>Gastos fijos</Text>
                 <Text style={[st.metricaValor, { color: Colors.error }]}>{formatearMoneda(resumen.totalCostos)}</Text>
               </View>
             </View>
@@ -354,14 +354,14 @@ export default function Obligaciones() {
           </>
         )}
 
-        {/* ===== COSTOS FIJOS ===== */}
+        {/* ===== GASTOS FIJOS ===== */}
         {tab === 'costos' && (
           <>
             <TouchableOpacity style={st.addBtn} onPress={() => setModal({ tipo: 'costo', editando: null })}>
               <Ionicons name="add-circle" size={20} color="#fff" /><Text style={st.addBtnText}>Agregar costo</Text>
             </TouchableOpacity>
             {costos.length === 0 ? (
-              <View style={st.empty}><Ionicons name="trending-down-outline" size={48} color={Colors.borde} /><Text style={st.emptyText}>Sin costos fijos registrados</Text></View>
+              <View style={st.empty}><Ionicons name="trending-down-outline" size={48} color={Colors.borde} /><Text style={st.emptyText}>Sin gastos fijos registrados</Text></View>
             ) : (
               <View style={st.listaCard}>
                 {costos.map((c) => (
@@ -539,14 +539,14 @@ export default function Obligaciones() {
                         <Text style={[st.proyFilaVal, { color: Colors.exito }]}>{formatearMoneda(m.ingresos)}</Text>
                       </View>
                       <View style={st.proyFila}>
-                        <Text style={st.proyFilaLabel}>Costos fijos</Text>
+                        <Text style={st.proyFilaLabel}>Gastos fijos</Text>
                         <Text style={[st.proyFilaVal, { color: Colors.error }]}>-{formatearMoneda(m.costosFijos)}</Text>
                       </View>
                       {m.ahorroCostos > 0 && (
                         <View style={st.proyFila}>
                           <View style={st.proyAhorroRow}>
                             <Ionicons name="leaf" size={12} color={Colors.exito} />
-                            <Text style={[st.proyFilaLabel, { color: Colors.exito }]}>Ahorro costos</Text>
+                            <Text style={[st.proyFilaLabel, { color: Colors.exito }]}>Ahorro gastos</Text>
                           </View>
                           <Text style={[st.proyFilaVal, { color: Colors.exito }]}>{formatearMoneda(m.ahorroCostos)}</Text>
                         </View>
@@ -587,7 +587,7 @@ export default function Obligaciones() {
                       {itemsCostos.length > 0 && (
                         <>
                           <View style={st.proySep} />
-                          <Text style={st.proyGrupoTitulo}>Costos fijos</Text>
+                          <Text style={st.proyGrupoTitulo}>Gastos fijos</Text>
                           {itemsCostos.map((it, j) => (
                             <View key={`c-${j}`} style={st.proyItem}>
                               <View style={st.proyItemHeader}>
@@ -674,7 +674,7 @@ export default function Obligaciones() {
             <View style={st.modalHeader}>
               <Text style={st.modalTitulo}>
                 {modal?.tipo === 'ingreso' ? (modal.editando ? 'Editar ingreso' : 'Nuevo ingreso seguro') :
-                 modal?.tipo === 'costo' ? (modal.editando ? 'Editar costo' : 'Nuevo costo fijo') :
+                 modal?.tipo === 'costo' ? (modal.editando ? 'Editar gasto fijo' : 'Nuevo gasto fijo') :
                  modal?.tipo === 'deuda' ? (modal.editando ? 'Editar deuda' : 'Nueva deuda') : ''}
               </Text>
               <TouchableOpacity onPress={() => setModal(null)}><Ionicons name="close" size={24} color={Colors.texto} /></TouchableOpacity>
@@ -694,7 +694,7 @@ export default function Obligaciones() {
         titulo="Eliminar"
         mensaje={
           confirmEliminar?.tipo === 'ingreso' ? '¿Eliminar este ingreso?' :
-          confirmEliminar?.tipo === 'costo'   ? '¿Eliminar este costo fijo?' :
+          confirmEliminar?.tipo === 'costo'   ? '¿Eliminar este gasto fijo?' :
                                                 '¿Eliminar esta deuda?'
         }
         textoCancelar="Cancelar"

@@ -63,15 +63,15 @@ router.delete('/ingresos/:id', async (req, res) => {
   }
 });
 
-// ===================== COSTOS FIJOS =====================
+// ===================== GASTOS FIJOS =====================
 
 router.get('/costos', async (req, res) => {
   try {
     const costos = await FixedCost.find({ user: req.user._id }).sort({ createdAt: -1 });
     res.json(costos);
   } catch (error) {
-    console.error('Error obteniendo costos fijos:', error.message);
-    res.status(500).json({ message: 'Error al obtener costos fijos' });
+    console.error('Error obteniendo gastos fijos:', error.message);
+    res.status(500).json({ message: 'Error al obtener gastos fijos' });
   }
 });
 
@@ -84,8 +84,8 @@ router.post('/costos', async (req, res) => {
       const mensajes = Object.values(error.errors).map((e) => e.message);
       return res.status(400).json({ message: 'Error de validación', errors: mensajes });
     }
-    console.error('Error creando costo fijo:', error.message);
-    res.status(500).json({ message: 'Error al crear costo fijo' });
+    console.error('Error creando gasto fijo:', error.message);
+    res.status(500).json({ message: 'Error al crear gasto fijo' });
   }
 });
 
@@ -99,8 +99,8 @@ router.put('/costos/:id', async (req, res) => {
     if (!costo) return res.status(404).json({ message: 'Costo no encontrado' });
     res.json(costo);
   } catch (error) {
-    console.error('Error actualizando costo fijo:', error.message);
-    res.status(500).json({ message: 'Error al actualizar costo fijo' });
+    console.error('Error actualizando gasto fijo:', error.message);
+    res.status(500).json({ message: 'Error al actualizar gasto fijo' });
   }
 });
 
@@ -110,8 +110,8 @@ router.delete('/costos/:id', async (req, res) => {
     if (!costo) return res.status(404).json({ message: 'Costo no encontrado' });
     res.json({ message: 'Costo eliminado' });
   } catch (error) {
-    console.error('Error eliminando costo fijo:', error.message);
-    res.status(500).json({ message: 'Error al eliminar costo fijo' });
+    console.error('Error eliminando gasto fijo:', error.message);
+    res.status(500).json({ message: 'Error al eliminar gasto fijo' });
   }
 });
 
@@ -316,7 +316,7 @@ router.get('/resumen', async (req, res) => {
     const totalAcumuladoCostos = Object.values(acumuladoCostos).reduce((s, v) => s + v, 0);
     const totalAcumuladoDeudas = Object.values(acumuladoDeudas).reduce((s, v) => s + v, 0);
 
-    // ===== Gastos reales del mes en costos fijos (para calcular ahorro) =====
+    // ===== Gastos reales del mes en gastos fijos (para calcular ahorro) =====
     const movsCostosMesActual = await Movement.find({
       user: req.user._id,
       'asignacion.tipo': 'costoFijo',
@@ -386,7 +386,7 @@ router.get('/resumen', async (req, res) => {
 
       const costosFijosEsperados = costos.filter((c) => costoActivoEnMes(c, fecha)).reduce((s, c) => s + c.monto, 0);
 
-      // Mes actual: si gastaste menos en costos fijos, la diferencia es ahorro
+      // Mes actual: si gastaste menos en gastos fijos, la diferencia es ahorro
       let cosMes;
       if (esMesActualLoop) {
         cosMes = Math.min(gastosRealesCostosFijos, costosFijosEsperados);
@@ -585,7 +585,7 @@ router.get('/progreso-mensual', async (req, res) => {
     const [anio, mesNum] = mes.split('-').map(Number);
     const fechaMes = new Date(anio, mesNum - 1, 1);
 
-    // Progreso de costos fijos
+    // Progreso de gastos fijos
     const progresoCostos = costos
       .filter((c) => costoActivoEnMes(c, fechaMes))
       .map((c) => {

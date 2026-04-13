@@ -268,7 +268,7 @@ router.post('/auto-asignar', async (req, res) => {
     const customMap = new Map();
     mappingsArr.forEach(m => customMap.set(m.descKey, m.categoria));
 
-    // Indexar costos fijos por categoría
+    // Indexar gastos fijos por categoría
     const costosPorCategoria = new Map();
     costosFijos.forEach((cf) => {
       if (!costosPorCategoria.has(cf.categoria)) {

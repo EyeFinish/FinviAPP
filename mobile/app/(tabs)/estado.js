@@ -250,7 +250,7 @@ export default function Estado() {
           <View style={styles.netoCard}>
             <View style={styles.netoRow}>
               <View>
-                <Text style={styles.netoLabel}>Balance neto</Text>
+                <Text style={styles.netoLabel}>Ahorro mensual</Text>
                 <Text style={[styles.netoMonto, { color: resumen.montoNeto >= 0 ? Colors.exito : Colors.error }]}>
                   {resumen.montoNeto >= 0 ? '+' : ''}{formatearMoneda(resumen.montoNeto)}
                 </Text>

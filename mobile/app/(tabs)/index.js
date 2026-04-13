@@ -762,7 +762,7 @@ export default function Dashboard() {
                   <View style={{ flex: 1, marginLeft: 12 }}>
                     <Text style={styles.opcionNombre}>{item.nombre}</Text>
                     <Text style={styles.opcionDetalle}>
-                      {item.tipo === 'costoFijo' ? 'Costo fijo' : 'Deuda'} · {formatearMoneda(item.monto)}/mes
+                      {item.tipo === 'costoFijo' ? 'Gasto fijo' : 'Deuda'} · {formatearMoneda(item.monto)}/mes
                     </Text>
                   </View>
                   <Ionicons name="add-circle-outline" size={22} color={Colors.primario} />
