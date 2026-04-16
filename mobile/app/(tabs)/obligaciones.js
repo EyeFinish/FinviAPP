@@ -94,7 +94,7 @@ function FormCosto({ inicial, onGuardar, onCancelar }) {
 
   return (
     <View style={st.formContainer}>
-      <Text style={st.formLabel}>Nombre del costo</Text>
+      <Text style={st.formLabel}>Nombre del gasto</Text>
       <TextInput style={st.formInput} value={nombre} onChangeText={setNombre} placeholder="Ej: Arriendo, Luz" />
       <Text style={st.formLabel}>Monto mensual</Text>
       <TextInput style={st.formInput} value={fmtMiles(monto)} onChangeText={(t) => setMonto(soloDigitos(t))} keyboardType="numeric" placeholder="0" />
@@ -254,7 +254,7 @@ export default function Obligaciones() {
     { id: 'proyeccion', label: 'Proyección', icon: 'bar-chart' },
     { id: 'resumen', label: 'Resumen', icon: 'pie-chart' },
     { id: 'ingresos', label: 'Ingresos', icon: 'cash' },
-    { id: 'costos', label: 'Costos', icon: 'trending-down' },
+    { id: 'costos', label: 'Gastos fijos', icon: 'trending-down' },
     { id: 'deudas', label: 'Deudas', icon: 'card' },
   ];
 
@@ -358,7 +358,7 @@ export default function Obligaciones() {
         {tab === 'costos' && (
           <>
             <TouchableOpacity style={st.addBtn} onPress={() => setModal({ tipo: 'costo', editando: null })}>
-              <Ionicons name="add-circle" size={20} color="#fff" /><Text style={st.addBtnText}>Agregar costo</Text>
+              <Ionicons name="add-circle" size={20} color="#fff" /><Text style={st.addBtnText}>Agregar Gastos fijos</Text>
             </TouchableOpacity>
             {costos.length === 0 ? (
               <View style={st.empty}><Ionicons name="trending-down-outline" size={48} color={Colors.borde} /><Text style={st.emptyText}>Sin gastos fijos registrados</Text></View>
