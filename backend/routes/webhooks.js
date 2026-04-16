@@ -4,7 +4,7 @@ const User = require('../models/User');
 const FintocLink = require('../models/FintocLink');
 const Account = require('../models/Account');
 const { enviarNotificacion } = require('../services/notificationService');
-const { syncAllUsers } = require('../services/syncScheduler');
+const { syncAllUsers, syncSingleLink } = require('../services/syncScheduler');
 const router = express.Router();
 
 // POST /api/webhooks/revenuecat
@@ -156,14 +156,11 @@ router.post('/fintoc', express.raw({ type: 'application/json' }), async (req, re
     ];
 
     if (eventosSync.includes(tipo) || eventosError.includes(tipo)) {
-      const dispararSync = async (link) => {
-        const fintocRoute = require('./fintoc');
-        if (typeof fintocRoute.ejecutarRefreshExterno === 'function') {
-          await fintocRoute.ejecutarRefreshExterno(link.user, [link]);
-        } else {
-          await syncAllUsers();
-        }
-      };
+      // Lookback de 2 días: el webhook ya confirma que hay datos nuevos, no necesitamos 30 días
+    const sinceOverride = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const dispararSync = async (link) => {
+      await syncSingleLink(link, { sinceOverride });
+    };
 
       // Para account.refresh_intent.* el payload trae data.refreshed_object_id = account Fintoc ID
       const accountFintocId = payload.data?.refreshed_object_id;

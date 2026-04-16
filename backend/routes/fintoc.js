@@ -8,6 +8,7 @@ const Movement = require('../models/Movement');
 const Credit = require('../models/Credit');
 const { calcularActualizacionError, calcularActualizacionExito } = require('../services/fintocErrorHandler');
 const { enviarNotificacion } = require('../services/notificationService');
+const { syncSingleLink } = require('../services/syncScheduler');
 
 // Todas las rutas requieren autenticación
 router.use(auth);
@@ -743,6 +744,42 @@ router.get('/diagnostico', async (req, res) => {
   } catch (error) {
     console.error('[Diagnostico] Error:', error.message);
     res.status(500).json({ message: error.message });
+  }
+});
+
+// POST /api/fintoc/sync-now
+// Dispara un sync inmediato de todos los links del usuario autenticado.
+// Llama createRefreshIntent (para que Fintoc actualice desde el banco) y luego
+// sincroniza los movimientos disponibles en ese momento con lookback de 7 días.
+// El webhook account.refresh_intent.succeeded hará un segundo sync cuando Fintoc termine.
+router.post('/sync-now', async (req, res) => {
+  try {
+    const links = await FintocLink.find({ user: req.user.id, status: { $in: ['active', 'error'] } }).lean();
+    if (!links.length) {
+      return res.json({ queued: false, message: 'No hay cuentas bancarias conectadas' });
+    }
+
+    const sinceOverride = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+    // Responder inmediatamente — el sync corre en background
+    res.json({ queued: true, links: links.length });
+
+    for (const link of links) {
+      // Fire-and-forget: pedir a Fintoc que refresque desde el banco
+      fintocService.createRefreshIntent(link.linkToken).catch((err) =>
+        console.warn(`[SyncNow] No se pudo crear refresh intent para link ${link._id}: ${err.message}`)
+      );
+      // Sync inmediato con lo que ya tiene Fintoc (últimos 7 días)
+      syncSingleLink(link, { sinceOverride }).catch((err) =>
+        console.error(`[SyncNow] Error en syncSingleLink para link ${link._id}: ${err.message}`)
+      );
+    }
+  } catch (error) {
+    console.error('[SyncNow] Error:', error.message);
+    // Si res ya fue enviada, no volver a responder
+    if (!res.headersSent) {
+      res.status(500).json({ message: error.message });
+    }
   }
 });
 
