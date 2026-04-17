@@ -406,15 +406,6 @@ async function ejecutarRefresh(userId, links) {
       try {
         const accountsData = await fintocService.getAccounts(link.linkToken);
 
-        // Refresh intent opera a nivel de link — una sola llamada por link.
-        // Fire-and-forget: el webhook account.refresh_intent.succeeded traerá los datos frescos.
-        try {
-          await fintocService.createRefreshIntent(link.linkToken);
-          console.log(`[Refresh] Refresh intent creado para link ${link._id}`);
-        } catch (riErr) {
-          console.warn(`[Refresh] No se pudo crear refresh intent para link ${link._id}: ${riErr.message}`);
-        }
-
         const accountPromises = accountsData.map(async (accData) => {
           const account = await Account.findOneAndUpdate(
             { fintocId: accData.id },
@@ -747,39 +738,23 @@ router.get('/diagnostico', async (req, res) => {
   }
 });
 
-// POST /api/fintoc/sync-now
-// Dispara un sync inmediato de todos los links del usuario autenticado.
-// Llama createRefreshIntent (para que Fintoc actualice desde el banco) y luego
-// sincroniza los movimientos disponibles en ese momento con lookback de 7 días.
-// El webhook account.refresh_intent.succeeded hará un segundo sync cuando Fintoc termine.
+// POST /api/fintoc/sync-now — alias de /refresh para compatibilidad
 router.post('/sync-now', async (req, res) => {
   try {
-    const links = await FintocLink.find({ user: req.user.id, status: { $in: ['active', 'error'] } }).lean();
+    const userId = req.user._id;
+    if (refreshEnProgreso.has(String(userId))) {
+      return res.json({ message: 'Sincronización ya en progreso', status: 'running' });
+    }
+    const links = await FintocLink.find({ user: userId, status: { $in: ['active', 'error'] } });
     if (!links.length) {
       return res.json({ queued: false, message: 'No hay cuentas bancarias conectadas' });
     }
-
-    const sinceOverride = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-
-    // Responder inmediatamente — el sync corre en background
-    res.json({ queued: true, links: links.length });
-
-    for (const link of links) {
-      // Fire-and-forget: pedir a Fintoc que refresque desde el banco
-      fintocService.createRefreshIntent(link.linkToken).catch((err) =>
-        console.warn(`[SyncNow] No se pudo crear refresh intent para link ${link._id}: ${err.message}`)
-      );
-      // Sync inmediato con lo que ya tiene Fintoc (últimos 7 días)
-      syncSingleLink(link, { sinceOverride }).catch((err) =>
-        console.error(`[SyncNow] Error en syncSingleLink para link ${link._id}: ${err.message}`)
-      );
-    }
+    refreshEnProgreso.set(String(userId), true);
+    ejecutarRefresh(userId, links);
+    res.json({ queued: true, status: 'running' });
   } catch (error) {
     console.error('[SyncNow] Error:', error.message);
-    // Si res ya fue enviada, no volver a responder
-    if (!res.headersSent) {
-      res.status(500).json({ message: error.message });
-    }
+    if (!res.headersSent) res.status(500).json({ message: error.message });
   }
 });
 

@@ -15,14 +15,7 @@ async function syncSingleLink(link, options = {}) {
   try {
     const accountsData = await fintocService.getAccounts(link.linkToken);
 
-    // Refresh intent opera a nivel de link — una sola llamada por link.
-    // Fire-and-forget: el webhook account.refresh_intent.succeeded traerá los datos frescos.
-    try {
-      await fintocService.createRefreshIntent(link.linkToken);
-      console.log(`[SyncScheduler] Refresh intent creado para link ${link._id}`);
-    } catch (riErr) {
-      console.warn(`[SyncScheduler] No se pudo crear refresh intent para link ${link._id}: ${riErr.message}`);
-    }
+    let totalNuevos = 0;
 
     const accountPromises = accountsData.map(async (accData) => {
       const account = await Account.findOne({ fintocId: accData.id });
@@ -80,6 +73,7 @@ async function syncSingleLink(link, options = {}) {
         });
         const bulkResult = await Movement.bulkWrite(bulkOps, { ordered: false });
         const nuevos = bulkResult.upsertedCount || 0;
+        totalNuevos += nuevos;
         console.log(`[SyncScheduler] Usuario ${userId} - cuenta ${accData.id}: ${movementsData.length} movimientos (${nuevos} nuevos)`);
 
         if (nuevos > 0) {
@@ -99,14 +93,20 @@ async function syncSingleLink(link, options = {}) {
 
     await Promise.allSettled(accountPromises);
 
-    // Éxito: reset contador de fallos
-    await FintocLink.findByIdAndUpdate(link._id, calcularActualizacionExito());
+    // Éxito: reset contador de fallos y guardar resultado del sync
+    await FintocLink.findByIdAndUpdate(link._id, {
+      ...calcularActualizacionExito(),
+      lastSyncResult: { movimientos: totalNuevos, error: null, fecha: new Date() },
+    });
 
   } catch (err) {
     console.error(`[SyncScheduler] Error en link ${link._id}:`, err.message);
 
     const actualizacion = calcularActualizacionError(err, link);
-    await FintocLink.findByIdAndUpdate(link._id, actualizacion).catch(() => {});
+    await FintocLink.findByIdAndUpdate(link._id, {
+      ...actualizacion,
+      lastSyncResult: { movimientos: 0, error: err.message, fecha: new Date() },
+    }).catch(() => {});
 
     if (actualizacion.status === 'error') {
       console.error(`[SyncScheduler] Link ${link._id} marcado como 'error' tras ${link.syncFailureCount + 1} fallos consecutivos`);

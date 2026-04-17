@@ -45,6 +45,11 @@ const fintocLinkSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    lastSyncResult: {
+      movimientos: { type: Number, default: 0 },
+      error: { type: String, default: null },
+      fecha: { type: Date, default: null },
+    },
   },
   {
     timestamps: true,
