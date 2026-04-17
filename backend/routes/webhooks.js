@@ -142,20 +142,38 @@ router.post('/fintoc', express.raw({ type: 'application/json' }), async (req, re
 
     console.log(`[Webhook Fintoc] Evento recibido: ${tipo}`);
 
-    // Eventos que indican nuevos movimientos disponibles
-    const eventosSync = [
-      'account.refresh_intent.succeeded',   // cuenta terminó de refrescarse — hay datos nuevos
-      'account.refresh_intent.movements_modified', // movimientos existentes cambiaron (pending→confirmed)
-      'link.refresh_intent.succeeded',       // refresh de link completo (todas las cuentas)
-    ];
-
     // Eventos que indican credenciales inválidas — marcar link como error
     const eventosError = [
       'link.credentials_changed',
       'account.refresh_intent.rejected',    // banco rechazó credenciales — necesita reconexión
+      'link.credentials_invalid',
     ];
 
-    if (eventosSync.includes(tipo) || eventosError.includes(tipo)) {
+    // Eventos que indican nuevos movimientos disponibles.
+    // Incluye tanto refresh_intent (plan de pago) como eventos de refresco automático
+    // que Fintoc dispara en su propio ciclo sin necesidad de solicitarlo.
+    const eventosSync = [
+      'account.refresh_intent.succeeded',
+      'account.refresh_intent.movements_modified',
+      'link.refresh_intent.succeeded',
+      // Eventos de refresco automático (plan gratuito)
+      'link.movements_updated',
+      'account.movements_updated',
+      'link.refreshed',
+      'account.refreshed',
+    ];
+
+    // Cualquier evento no reconocido que no sea error: loguear y sincronizar igualmente.
+    // Esto asegura que si Fintoc añade nuevos tipos de eventos de actualización no los ignoremos.
+    const esEventoError = eventosError.includes(tipo);
+    const esEventoSync = eventosSync.includes(tipo);
+    const esEventoDesconocido = !esEventoError && !esEventoSync;
+
+    if (esEventoDesconocido) {
+      console.log(`[Webhook Fintoc] Evento desconocido "${tipo}" — se sincronizará por precaución`);
+    }
+
+    if (esEventoSync || esEventoError || esEventoDesconocido) {
       // Lookback de 2 días: el webhook ya confirma que hay datos nuevos, no necesitamos 30 días
     const sinceOverride = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     const dispararSync = async (link) => {
@@ -194,8 +212,6 @@ router.post('/fintoc', express.raw({ type: 'application/json' }), async (req, re
         console.log(`[Webhook Fintoc] Sin account/link ID — sincronizando todos los usuarios`);
         syncAllUsers().catch((err) => console.error('[Webhook Fintoc] Error en syncAllUsers:', err.message));
       }
-    } else {
-      console.log(`[Webhook Fintoc] Evento ignorado: ${tipo}`);
     }
   } catch (err) {
     console.error('[Webhook Fintoc] Error procesando evento:', err.message);

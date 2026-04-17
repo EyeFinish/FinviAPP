@@ -1,52 +1,13 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, RefreshControl,
-  TouchableOpacity, ActivityIndicator, Modal, Platform,
+  TouchableOpacity, ActivityIndicator, Modal,
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { obtenerEstadoFinanciero, resincronizarDatos, obtenerSyncStatus, obtenerCategoriasDisponibles, categorizarMovimiento, obtenerUpdateLinkIntent, intercambiarToken } from '../../services/api';
+import { obtenerEstadoFinanciero, refrescarDatos, obtenerSyncStatus, obtenerCategoriasDisponibles, categorizarMovimiento } from '../../services/api';
 import { formatearMoneda, formatearFecha } from '../../utils/formateadores';
 import { Colors, Spacing, FontSize, BorderRadius } from '../../constants/theme';
-
-let WebView = null;
-if (Platform.OS !== 'web') {
-  WebView = require('react-native-webview').WebView;
-}
-
-const FINTOC_WIDGET_HTML = (publicKey, widgetToken) => `
-<!DOCTYPE html><html><head>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<style>body{margin:0;background:#f8f9fe;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif}
-.msg{text-align:center;color:#6b7280;font-size:14px;padding:20px}</style>
-</head><body>
-<div class="msg">Actualizando conexión bancaria...</div>
-<script src="https://js.fintoc.com/v1/"></script>
-<script>
-  try {
-    const widget = Fintoc.create({
-      publicKey: '${publicKey}',
-      widgetToken: '${widgetToken}',
-      onSuccess: function(link) {
-        var token = typeof link === 'string' ? link : (link.exchangeToken || link.exchange_token || '');
-        window.ReactNativeWebView.postMessage(JSON.stringify({type:'success', exchangeToken: token}));
-      },
-      onExit: function() {
-        window.ReactNativeWebView.postMessage(JSON.stringify({type:'exit'}));
-      },
-      onEvent: function(name, meta) {
-        if (name === 'on_error') {
-          window.ReactNativeWebView.postMessage(JSON.stringify({type:'error', message: meta?.message || 'Error en el widget'}));
-        }
-      }
-    });
-    widget.open();
-  } catch(e) {
-    window.ReactNativeWebView.postMessage(JSON.stringify({type:'error', message: e.message}));
-  }
-</script>
-</body></html>
-`;
 
 export default function Estado() {
   const hoy = new Date();
@@ -59,55 +20,52 @@ export default function Estado() {
   const [vista, setVista] = useState('categoria');
   const [resyncLoading, setResyncLoading] = useState(false);
   const [resyncError, setResyncError] = useState(null);
-  const [widgetVisible, setWidgetVisible] = useState(false);
-  const [widgetHtml, setWidgetHtml] = useState('');
-  const [widgetStatus, setWidgetStatus] = useState('idle'); // idle | syncing | success | error
+  const [resyncMsg, setResyncMsg] = useState(null);
   const [expandido, setExpandido] = useState(null);
   const [moverItem, setMoverItem] = useState(null);
   const [catDisponibles, setCatDisponibles] = useState([]);
 
-  // Abre el widget de Fintoc para re-autenticar el banco y obtener datos frescos.
-  // Fintoc solo devuelve transacciones nuevas cuando se crea/actualiza el link.
+  // Dispara una verificación inmediata de transacciones nuevas y muestra el resultado.
+  // La detección automática ocurre en background cada 5 min (cron) y via webhooks de Fintoc.
   const hacerResync = async () => {
     setResyncError(null);
+    setResyncMsg(null);
+    setResyncLoading(true);
     try {
-      setResyncLoading(true);
-      const res = await obtenerUpdateLinkIntent();
-      const intent = res.data?.intents?.[0];
-      if (!intent?.widgetToken) {
-        setResyncError('No hay cuentas bancarias conectadas.');
-        return;
+      await refrescarDatos();
+
+      // Polling hasta recibir resultado del backend (máx 60s, cada 3s)
+      let intentos = 0;
+      while (intentos < 20) {
+        await new Promise((r) => setTimeout(r, 3000));
+        try {
+          const st = await obtenerSyncStatus();
+          const resultado = st.data?.ultimoResultado;
+          if (resultado?.completedAt) {
+            if (resultado.error) {
+              setResyncError(`Error al sincronizar: ${resultado.error}`);
+              setTimeout(() => setResyncError(null), 6000);
+            } else {
+              const msg = resultado.movimientos > 0
+                ? `${resultado.movimientos} transacciones nuevas encontradas`
+                : 'Todo al día';
+              setResyncMsg(msg);
+              setTimeout(() => setResyncMsg(null), 6000);
+              if (resultado.movimientos > 0) await cargarDatos();
+            }
+            return;
+          }
+        } catch { /* silencioso */ }
+        intentos++;
       }
-      setWidgetHtml(FINTOC_WIDGET_HTML(intent.publicKey, intent.widgetToken));
-      setWidgetStatus('idle');
-      setWidgetVisible(true);
+      // Timeout: recargar de todas formas
+      await cargarDatos();
     } catch (err) {
-      setResyncError(err.response?.data?.message || 'Error al iniciar actualización bancaria.');
+      setResyncError(err.response?.data?.message || 'Error al sincronizar');
       setTimeout(() => setResyncError(null), 5000);
     } finally {
       setResyncLoading(false);
     }
-  };
-
-  const handleWidgetMessage = async (event) => {
-    try {
-      const data = JSON.parse(event.nativeEvent.data);
-      if (data.type === 'success') {
-        setWidgetStatus('syncing');
-        await intercambiarToken(data.exchangeToken);
-        setWidgetStatus('success');
-        setWidgetVisible(false);
-        await cargarDatos();
-      } else if (data.type === 'exit') {
-        setWidgetVisible(false);
-        setWidgetStatus('idle');
-      } else if (data.type === 'error') {
-        setResyncError(data.message || 'Error en el widget bancario.');
-        setWidgetVisible(false);
-        setWidgetStatus('idle');
-        setTimeout(() => setResyncError(null), 5000);
-      }
-    } catch { /* mensaje no JSON, ignorar */ }
   };
 
   const cargarDatos = async (mesParam) => {
@@ -270,6 +228,11 @@ export default function Estado() {
       {resyncError ? (
         <View style={styles.resyncErrorMsg}>
           <Text style={styles.resyncErrorText}>⚠ {resyncError}</Text>
+        </View>
+      ) : null}
+      {resyncMsg ? (
+        <View style={styles.resyncSuccessMsg}>
+          <Text style={styles.resyncSuccessText}>✓ {resyncMsg}</Text>
         </View>
       ) : null}
 
@@ -479,39 +442,6 @@ export default function Estado() {
         </View>
       </Modal>
 
-      {/* Modal del widget de Fintoc para re-autenticación bancaria */}
-      <Modal visible={widgetVisible} animationType="slide" onRequestClose={() => { setWidgetVisible(false); setWidgetStatus('idle'); }}>
-        <View style={{ flex: 1, backgroundColor: '#f8f9fe' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', paddingTop: 50, paddingHorizontal: 16, paddingBottom: 12, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: Colors.borde }}>
-            <TouchableOpacity onPress={() => { setWidgetVisible(false); setWidgetStatus('idle'); }} style={{ marginRight: 12 }}>
-              <Ionicons name="close" size={24} color={Colors.texto} />
-            </TouchableOpacity>
-            <Text style={{ fontSize: FontSize.md, fontWeight: '700', color: Colors.texto }}>
-              {widgetStatus === 'syncing' ? 'Obteniendo transacciones...' : 'Actualizar conexión bancaria'}
-            </Text>
-          </View>
-          {widgetStatus === 'syncing' ? (
-            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16 }}>
-              <ActivityIndicator size="large" color={Colors.primario} />
-              <Text style={{ fontSize: FontSize.md, color: Colors.textoSecundario }}>Importando transacciones nuevas...</Text>
-            </View>
-          ) : (
-            Platform.OS !== 'web' && WebView && widgetHtml ? (
-              <WebView
-                source={{ html: widgetHtml }}
-                onMessage={handleWidgetMessage}
-                javaScriptEnabled
-                domStorageEnabled
-                style={{ flex: 1 }}
-              />
-            ) : (
-              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <Text style={{ color: Colors.textoSecundario }}>Widget no disponible en esta plataforma</Text>
-              </View>
-            )
-          )}
-        </View>
-      </Modal>
     </ScrollView>
   );
 }
@@ -542,6 +472,8 @@ const styles = StyleSheet.create({
   resyncBtnText: { fontSize: FontSize.xs, fontWeight: '600', color: Colors.primario },
   resyncErrorMsg: { marginHorizontal: Spacing.lg, marginTop: 4, padding: Spacing.sm, backgroundColor: '#fff3cd', borderRadius: BorderRadius.sm, borderWidth: 1, borderColor: '#ffc107' },
   resyncErrorText: { fontSize: FontSize.xs, color: '#856404' },
+  resyncSuccessMsg: { marginHorizontal: Spacing.lg, marginTop: 4, padding: Spacing.sm, backgroundColor: '#d1fae5', borderRadius: BorderRadius.sm, borderWidth: 1, borderColor: '#6ee7b7' },
+  resyncSuccessText: { fontSize: FontSize.xs, color: '#065f46' },
 
   // Mini cards
   row: { flexDirection: 'row', marginHorizontal: Spacing.lg, marginTop: Spacing.md },
