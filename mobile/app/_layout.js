@@ -60,6 +60,25 @@ function RootNavigator() {
     if (user) registrarPush();
   }, [user, cargando, pendienteOnboarding, segments]);
 
+  // Navegar a la pantalla correcta al tocar una notificación (app en foreground o background)
+  useEffect(() => {
+    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+      const screen = response.notification.request.content.data?.screen;
+      if (screen) router.push(screen);
+    });
+    return () => sub.remove();
+  }, []);
+
+  // Arranque en frío: la notificación abrió la app desde cerrada
+  useEffect(() => {
+    if (cargando || !user) return;
+    Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (!response) return;
+      const screen = response.notification.request.content.data?.screen;
+      if (screen) router.push(screen);
+    });
+  }, [user, cargando]);
+
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(auth)" />

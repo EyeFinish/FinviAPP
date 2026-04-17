@@ -4,6 +4,16 @@ const Notification = require('../models/Notification');
 
 const expo = new Expo();
 
+const screenPorTipo = {
+  nueva_transaccion: '/(tabs)/cuentas',
+  pago_proximo:      '/(tabs)/obligaciones',
+  gasto_inusual:     '/(tabs)/estado',
+  resumen_semanal:   '/(tabs)/estado',
+  salud_baja:        '/(tabs)/obligaciones',
+  suscripcion:       '/(tabs)',
+  general:           '/(tabs)',
+};
+
 async function enviarNotificacion(userId, { titulo, cuerpo, tipo = 'general' }) {
   // Guardar en BD
   await Notification.create({ user: userId, titulo, cuerpo, tipo });
@@ -19,7 +29,7 @@ async function enviarNotificacion(userId, { titulo, cuerpo, tipo = 'general' }) 
       sound: 'default',
       title: titulo,
       body: cuerpo,
-      data: { tipo },
+      data: { tipo, screen: screenPorTipo[tipo] || '/(tabs)' },
     }));
 
   if (!messages.length) return;
