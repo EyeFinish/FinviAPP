@@ -121,7 +121,13 @@ async function syncAllUsers() {
 
   // Incluir links en 'error' para permitir auto-recovery: si Fintoc responde OK,
   // calcularActualizacionExito() los resetea automáticamente a status:'active'
-  const activeLinks = await FintocLink.find({ status: { $in: ['active', 'error'] } }).lean();
+  const activeLinks = await FintocLink.find({
+    $or: [
+      { status: 'active' },
+      // Links en error por fallos transitorios (timeout/5xx): pueden auto-recuperarse
+      { status: 'error', lastSyncError: { $not: /^\[Permanente\]/ } },
+    ],
+  }).lean();
   if (!activeLinks.length) {
     console.log('[SyncScheduler] No hay links para sincronizar');
     return;
