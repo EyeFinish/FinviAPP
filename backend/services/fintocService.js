@@ -13,12 +13,14 @@ fintocApi.interceptors.request.use((config) => {
   return config;
 });
 
-const createLinkIntent = async () => {
-  const response = await fintocApi.post('/link_intents', {
+const createLinkIntent = async (linkId = null) => {
+  const body = {
     product: 'movements',
     country: 'cl',
     holder_type: 'individual',
-  });
+  };
+  if (linkId) body.link_id = linkId; // update intent: refresca un link existente
+  const response = await fintocApi.post('/link_intents', body);
   return response.data;
 };
 

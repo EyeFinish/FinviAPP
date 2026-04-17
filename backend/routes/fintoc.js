@@ -738,6 +738,31 @@ router.get('/diagnostico', async (req, res) => {
   }
 });
 
+// POST /api/fintoc/update-link-intent
+// Crea un link_intent de ACTUALIZACIÓN para cada link activo del usuario.
+// Retorna { intents: [{ linkId, widgetToken, publicKey }] }
+// El app abre el widget con el widgetToken → usuario re-autentica →
+// widget devuelve exchangeToken → llamar POST /exchange → datos frescos del banco.
+router.post('/update-link-intent', async (req, res) => {
+  try {
+    const links = await FintocLink.find({ user: req.user._id, status: { $in: ['active', 'error'] } }).lean();
+    if (!links.length) return res.status(404).json({ message: 'No hay conexiones bancarias activas' });
+
+    const publicKey = process.env.FINTOC_PUBLIC_KEY;
+    const intents = await Promise.all(
+      links.map(async (link) => {
+        const intent = await fintocService.createLinkIntent(link.linkId);
+        return { linkId: link.linkId, widgetToken: intent.widget_token, publicKey };
+      })
+    );
+
+    res.json({ intents });
+  } catch (error) {
+    console.error('[UpdateLinkIntent] Error:', error.message);
+    res.status(500).json({ message: error.message });
+  }
+});
+
 // POST /api/fintoc/sync-now — alias de /refresh para compatibilidad
 router.post('/sync-now', async (req, res) => {
   try {

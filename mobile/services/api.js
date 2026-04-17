@@ -55,6 +55,7 @@ export const eliminarConexion = (linkId) => api.delete(`/fintoc/links/${linkId}`
 export const refrescarDatos = () => api.post('/fintoc/refresh');
 export const resincronizarDatos = () => api.post('/fintoc/resync');
 export const obtenerSyncStatus = () => api.get('/fintoc/sync-status');
+export const obtenerUpdateLinkIntent = () => api.post('/fintoc/update-link-intent');
 
 // ============ OBLIGACIONES FINANCIERAS ============
 export const obtenerResumenObligaciones = () => api.get('/obligaciones/resumen');
