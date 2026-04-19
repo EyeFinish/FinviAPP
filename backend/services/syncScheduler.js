@@ -134,6 +134,19 @@ async function syncAllUsers() {
   }
 
   for (const link of activeLinks) {
+    // Solicitar a Fintoc datos frescos del banco. Fintoc responde vía webhook
+    // 'account.refresh_intent.succeeded' cuando los datos están listos.
+    // El syncSingleLink de abajo es fallback por si el webhook no llega.
+    try {
+      await fintocService.createRefreshIntent(link.linkToken, 'only_last');
+      console.log(`[SyncScheduler] Refresh intent creado para link ${link._id}`);
+    } catch (err) {
+      const status = err.response?.status;
+      // 409 = refresh ya en curso (cooldown activo), ignorar
+      if (status !== 409) {
+        console.warn(`[SyncScheduler] Refresh intent fallido para link ${link._id} (${status}): ${err.message}`);
+      }
+    }
     await syncSingleLink(link);
   }
 
